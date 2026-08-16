@@ -25,6 +25,10 @@ class Canopy {
 
         ctx.save();
 
+        // Branches narrow at every fork, so a flat cap would leave the parent's
+        // square end poking out past its children. A round cap fills the joint.
+        ctx.lineCap = options.lineCap;
+
         ctx.beginPath();
         ctx.lineWidth = options.trunkWidth;
         ctx.strokeStyle = options.branchColor;
@@ -99,7 +103,8 @@ Canopy.defaults = {
     maxDepth: 11,
     leafDepth: 5,
     branchColor: 'Black',
-    leafColor: 'Green'
+    leafColor: 'Green',
+    lineCap: 'round'
 };
 
 if (typeof module !== 'undefined' && module.exports) {

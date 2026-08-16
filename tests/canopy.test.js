@@ -218,6 +218,20 @@ describe('Canopy', () => {
             expect(colors).toEqual(['Black', 'Black', 'Black', 'Green', 'Green']);
         });
 
+        it('should round the line caps so branch joints are filled', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 2 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.lineCap).toBe('round');
+        });
+
+        it('should honour a custom lineCap', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 2, lineCap: 'butt' });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.lineCap).toBe('butt');
+        });
+
         it('should restore the context state it changed', () => {
             const canopy = new Canopy(mockCtx, { maxDepth: 2 });
             canopy.RenderCanopy();

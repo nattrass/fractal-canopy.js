@@ -78,6 +78,7 @@ canopy.RenderCanopy();
 | `maxDepth` | `11` | How many times the canopy forks |
 | `leafDepth` | `5` | Depth at which branches switch to the leaf colour |
 | `branchColor` / `leafColor` | `'Black'` / `'Green'` | Stroke colours |
+| `lineCap` | `'round'` | Canvas line cap. Round fills the joint where a branch forks; `'butt'` leaves a visible step |
 
 The defaults are exposed as `Canopy.defaults`.
 
