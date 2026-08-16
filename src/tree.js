@@ -1,65 +1,97 @@
 const CoordinateClass = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
 
 class Canopy {
-    constructor(ctx) {
+    constructor(ctx, options) {
         this.ctx = ctx;
+        this.options = Object.assign({}, Canopy.defaults, options);
     }
 
     RenderCanopy() {
         const ctx = this.ctx;
-        let drawLine = function (x, y, length, angle, iterations, width) {
-            count++;
+        const options = this.options;
+        const base = new CoordinateClass(options.originX, options.originY);
+        const crown = new CoordinateClass(base.x, base.y - options.trunkLength);
+        const levels = this.GrowBranches(crown);
 
-            if (iterations >= 11) {
+        ctx.save();
+
+        ctx.beginPath();
+        ctx.lineWidth = options.trunkWidth;
+        ctx.strokeStyle = options.branchColor;
+        ctx.moveTo(base.x, base.y);
+        ctx.lineTo(crown.x, crown.y);
+        ctx.stroke();
+
+        // Every branch at a given depth shares a width and colour, so each depth
+        // is stroked as a single path rather than one path per branch.
+        for (let depth = 0; depth < levels.length; depth++) {
+            ctx.beginPath();
+            ctx.lineWidth = options.branchWidth * Math.pow(options.widthScale, depth);
+            ctx.strokeStyle = depth >= options.leafDepth ? options.leafColor : options.branchColor;
+
+            for (const branch of levels[depth]) {
+                ctx.moveTo(branch.x1, branch.y1);
+                ctx.lineTo(branch.x2, branch.y2);
+            }
+
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    // Walks the fractal and returns the branch geometry bucketed by depth,
+    // where levels[depth] holds every branch grown at that depth.
+    GrowBranches(crown) {
+        const options = this.options;
+        const levels = [];
+
+        const grow = (x, y, length, angle, depth) => {
+            if (depth >= options.maxDepth) {
                 return;
             }
 
-            let leftRandomNumber = Math.floor((Math.random() * 2) + 1);
-            let rightRandomNumber = Math.floor((Math.random() * 2) + 1);
-
-            ctx.beginPath();
-            ctx.lineWidth = width;
-            ctx.moveTo(x, y);
-            var leftangle = angle + (((2 * Math.PI / 11 + Math.random()) * 57.295779513082) / 2);
-            var leftx = x + length * Math.sin(leftangle * 0.017453292519);
-            var lefty = y + length * Math.cos(leftangle * 0.017453292519);
-            ctx.lineTo(leftx, lefty);
-
-            ctx.moveTo(x, y);
-
-            var rightangle = angle - (((2 * Math.PI / 11 + Math.random()) * 57.295779513082) / 2);
-            var rightx = x + length * Math.sin(rightangle * 0.017453292519);
-            var righty = y + length * Math.cos(rightangle * 0.017453292519);
-            ctx.lineTo(rightx, righty);
-
-            if (iterations >= 5) {
-                ctx.strokeStyle = 'Green';
+            if (!levels[depth]) {
+                levels[depth] = [];
             }
-            else {
-                ctx.strokeStyle = 'Black';
+
+            // A branch forks left (+1) and right (-1) by half the spread, jittered
+            // independently on each side so the canopy grows unevenly.
+            for (const direction of [1, -1]) {
+                const spread = options.branchSpread + Math.random() * options.spreadJitter;
+                const branchAngle = angle + direction * (spread / 2);
+                const endX = x + length * Math.sin(branchAngle);
+                const endY = y + length * Math.cos(branchAngle);
+
+                levels[depth].push({ x1: x, y1: y, x2: endX, y2: endY });
+                grow(endX, endY, length * options.lengthScale, branchAngle, depth + 1);
             }
-            ctx.stroke();
-
-            drawLine(leftx, lefty, length * 0.75, leftangle, iterations + 1, width * 0.6);
-            drawLine(rightx, righty, length * 0.75, rightangle, iterations + 1, width * 0.6);
-
         };
 
-        var count = 0;
-        var startPoint = new CoordinateClass(400, 400);
-        var length = 75;
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
-        startPoint.y = startPoint.y - 100;
-        ctx.lineTo(startPoint.x, startPoint.y);
-        ctx.lineWidth = 20;
-        ctx.stroke();
+        grow(crown.x, crown.y, options.branchLength, options.startAngle, 0);
 
-        drawLine(startPoint.x, startPoint.y, length, 180, count, 20);
+        return levels;
     }
 }
+
+Canopy.defaults = {
+    originX: 400,
+    originY: 400,
+    startAngle: Math.PI,
+    trunkLength: 100,
+    trunkWidth: 20,
+    branchLength: 75,
+    branchWidth: 20,
+    lengthScale: 0.75,
+    widthScale: 0.6,
+    branchSpread: (2 * Math.PI) / 11,
+    spreadJitter: 1,
+    maxDepth: 11,
+    leafDepth: 5,
+    branchColor: 'Black',
+    leafColor: 'Green'
+};
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Canopy;
 }
-

@@ -11,6 +11,8 @@ describe('Canopy', () => {
             moveTo: jest.fn(),
             lineTo: jest.fn(),
             stroke: jest.fn(),
+            save: jest.fn(),
+            restore: jest.fn(),
             lineWidth: null,
             strokeStyle: null
         };
@@ -93,6 +95,8 @@ describe('Canopy', () => {
                 moveTo: jest.fn(),
                 lineTo: jest.fn(),
                 stroke: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
                 lineWidth: null,
                 strokeStyle: null
             };
@@ -106,10 +110,127 @@ describe('Canopy', () => {
         });
     });
 
+    describe('options', () => {
+        it('should fall back to the default options', () => {
+            const canopy = new Canopy(mockCtx);
+            expect(canopy.options).toEqual(Canopy.defaults);
+        });
+
+        it('should override only the options that are supplied', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 3, leafColor: 'Red' });
+
+            expect(canopy.options.maxDepth).toBe(3);
+            expect(canopy.options.leafColor).toBe('Red');
+            expect(canopy.options.branchColor).toBe(Canopy.defaults.branchColor);
+        });
+
+        it('should not mutate the defaults', () => {
+            new Canopy(mockCtx, { maxDepth: 3 });
+            expect(Canopy.defaults.maxDepth).toBe(11);
+        });
+
+        it('should draw the trunk from the configured origin', () => {
+            const canopy = new Canopy(mockCtx, { originX: 10, originY: 200, trunkLength: 50, maxDepth: 0 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.moveTo).toHaveBeenCalledWith(10, 200);
+            expect(mockCtx.lineTo).toHaveBeenCalledWith(10, 150);
+        });
+    });
+
+    describe('GrowBranches', () => {
+        it('should grow one level per depth up to maxDepth', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 4 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            expect(levels.length).toBe(4);
+        });
+
+        it('should fork every branch in two', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 5 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            levels.forEach((level, depth) => {
+                expect(level.length).toBe(Math.pow(2, depth + 1));
+            });
+        });
+
+        it('should start each branch where its parent ended', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 4 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            for (let depth = 1; depth < levels.length; depth++) {
+                levels[depth].forEach((branch, index) => {
+                    const parent = levels[depth - 1][Math.floor(index / 2)];
+                    expect(branch.x1).toBe(parent.x2);
+                    expect(branch.y1).toBe(parent.y2);
+                });
+            }
+        });
+
+        it('should shorten each branch by the length scale', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 3, branchLength: 100, lengthScale: 0.5 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            levels.forEach((level, depth) => {
+                const expected = 100 * Math.pow(0.5, depth);
+                level.forEach(branch => {
+                    const length = Math.hypot(branch.x2 - branch.x1, branch.y2 - branch.y1);
+                    expect(length).toBeCloseTo(expected, 6);
+                });
+            });
+        });
+
+        it('should grow no branches when maxDepth is zero', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 0 });
+            expect(canopy.GrowBranches({ x: 0, y: 0 })).toEqual([]);
+        });
+    });
+
+    describe('drawing', () => {
+        it('should stroke once for the trunk and once per depth', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 4 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.stroke).toHaveBeenCalledTimes(5);
+            expect(mockCtx.beginPath).toHaveBeenCalledTimes(5);
+        });
+
+        it('should narrow the line width by the width scale at each depth', () => {
+            const widths = [];
+            const recordingCtx = Object.assign({}, mockCtx, {
+                stroke: jest.fn(() => widths.push(recordingCtx.lineWidth))
+            });
+
+            new Canopy(recordingCtx, { maxDepth: 3, trunkWidth: 10, branchWidth: 10, widthScale: 0.5 }).RenderCanopy();
+
+            expect(widths).toEqual([10, 10, 5, 2.5]);
+        });
+
+        it('should switch to the leaf color at leafDepth', () => {
+            const colors = [];
+            const recordingCtx = Object.assign({}, mockCtx, {
+                stroke: jest.fn(() => colors.push(recordingCtx.strokeStyle))
+            });
+
+            new Canopy(recordingCtx, { maxDepth: 4, leafDepth: 2 }).RenderCanopy();
+
+            expect(colors).toEqual(['Black', 'Black', 'Black', 'Green', 'Green']);
+        });
+
+        it('should restore the context state it changed', () => {
+            const canopy = new Canopy(mockCtx, { maxDepth: 2 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.save).toHaveBeenCalledTimes(1);
+            expect(mockCtx.restore).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('multiple renders', () => {
         it('should be able to render multiple canopies independently', () => {
-            const ctx1 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn() };
-            const ctx2 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn() };
+            const ctx1 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn(), save: jest.fn(), restore: jest.fn() };
+            const ctx2 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn(), save: jest.fn(), restore: jest.fn() };
 
             const canopy1 = new Canopy(ctx1);
             const canopy2 = new Canopy(ctx2);
@@ -122,8 +243,8 @@ describe('Canopy', () => {
         });
 
         it('should not affect other canopy instances', () => {
-            const ctx1 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn() };
-            const ctx2 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn() };
+            const ctx1 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn(), save: jest.fn(), restore: jest.fn() };
+            const ctx2 = { beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn(), save: jest.fn(), restore: jest.fn() };
 
             const canopy1 = new Canopy(ctx1);
             const canopy2 = new Canopy(ctx2);

@@ -51,6 +51,36 @@ Include the `dist/fractal-canopy.js` file in your HTML and grab a 2D context fro
 1. Create an instance of `Canopy`, passing in a canvas 2D context
 2. Call `RenderCanopy()` on the Canopy object to draw the fractal canopy
 
+### Options
+
+`Canopy` takes an optional second argument to override any of the defaults.
+Anything you leave out keeps its default value.
+
+```js
+var canopy = new Canopy(ctx, {
+    originX: 200,
+    originY: 400,
+    maxDepth: 9,
+    leafColor: 'Orange'
+});
+canopy.RenderCanopy();
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `originX` / `originY` | `400` / `400` | Point the trunk grows from |
+| `startAngle` | `Math.PI` | Direction the trunk grows in, in radians |
+| `trunkLength` / `trunkWidth` | `100` / `20` | Size of the trunk |
+| `branchLength` / `branchWidth` | `75` / `20` | Size of the first pair of branches |
+| `lengthScale` / `widthScale` | `0.75` / `0.6` | How much each branch shrinks per depth |
+| `branchSpread` | `2π / 11` | Angle between a pair of branches, in radians |
+| `spreadJitter` | `1` | Maximum random extra spread, in radians |
+| `maxDepth` | `11` | How many times the canopy forks |
+| `leafDepth` | `5` | Depth at which branches switch to the leaf colour |
+| `branchColor` / `leafColor` | `'Black'` / `'Green'` | Stroke colours |
+
+The defaults are exposed as `Canopy.defaults`.
+
 ## Development
 
 This project uses Grunt to automate build tasks:
