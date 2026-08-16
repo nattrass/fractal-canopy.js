@@ -4,12 +4,19 @@ class Coordinate {
         this.y = y;
     }
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Coordinate;
+}
+const CoordinateClass = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
+
 class Canopy {
     constructor(ctx) {
         this.ctx = ctx;
     }
 
     RenderCanopy() {
+        const ctx = this.ctx;
         let drawLine = function (x, y, length, angle, iterations, width) {
             count++;
 
@@ -49,7 +56,7 @@ class Canopy {
         };
 
         var count = 0;
-        var startPoint = new Coordinate(400, 400);
+        var startPoint = new CoordinateClass(400, 400);
         var length = 75;
         ctx.beginPath();
         ctx.moveTo(startPoint.x, startPoint.y);
@@ -60,5 +67,9 @@ class Canopy {
 
         drawLine(startPoint.x, startPoint.y, length, 180, count, 20);
     }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Canopy;
 }
 

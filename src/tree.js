@@ -1,4 +1,4 @@
-const Coordinate = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
+const CoordinateClass = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
 
 class Canopy {
     constructor(ctx) {
@@ -46,7 +46,7 @@ class Canopy {
         };
 
         var count = 0;
-        var startPoint = new Coordinate(400, 400);
+        var startPoint = new CoordinateClass(400, 400);
         var length = 75;
         ctx.beginPath();
         ctx.moveTo(startPoint.x, startPoint.y);
