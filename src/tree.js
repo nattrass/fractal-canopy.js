@@ -1,9 +1,12 @@
+const Coordinate = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
+
 class Canopy {
     constructor(ctx) {
         this.ctx = ctx;
     }
 
     RenderCanopy() {
+        const ctx = this.ctx;
         let drawLine = function (x, y, length, angle, iterations, width) {
             count++;
 
@@ -54,5 +57,9 @@ class Canopy {
 
         drawLine(startPoint.x, startPoint.y, length, 180, count, 20);
     }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Canopy;
 }
 

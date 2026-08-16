@@ -4,3 +4,7 @@ class Coordinate {
         this.y = y;
     }
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Coordinate;
+}

@@ -61,6 +61,36 @@ This project uses Grunt to automate build tasks:
 
 The Gruntfile.js contains all build configuration.
 
+## Testing
+
+This project uses Jest for unit testing:
+
+- `npm test` - Run all tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with code coverage report
+
+Test files are located in the `tests/` directory with the `.test.js` extension.
+
+### Running Tests
+
+After installing dependencies, you can run the test suite:
+
+```bash
+npm test
+```
+
+View code coverage:
+
+```bash
+npm run test:coverage
+```
+
+Watch mode for development (re-runs tests on file changes):
+
+```bash
+npm run test:watch
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details

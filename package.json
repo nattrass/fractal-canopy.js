@@ -4,12 +4,21 @@
   "repository": "https://github.com/nattrass/fractal-canopy.js",
   "license": "MIT",
   "version": "0.1.0",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build": "grunt",
+    "watch": "grunt watch",
+    "lint": "grunt jshint"
+  },
   "devDependencies": {
     "grunt": "1.5.3",
     "grunt-contrib-clean": "1.1.0",
     "grunt-contrib-jshint": "1.1.0",
     "grunt-contrib-concat": "1.0.1",
     "grunt-contrib-uglify-es": "3.3.0",
-    "grunt-contrib-watch": "1.1.0"
+    "grunt-contrib-watch": "1.1.0",
+    "jest": "^29.7.0"
   }
 }
