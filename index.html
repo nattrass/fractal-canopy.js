@@ -1,17 +1,153 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <title>fractal-canopy.js test harness</title>
+    <style>
+        body {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            font-family: system-ui, sans-serif;
+            margin: 24px;
+        }
 
+        canvas {
+            background-color: #FFF;
+            border: 1px solid #ccc;
+        }
+
+        #controls {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 12px;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        #controls label {
+            font-size: 14px;
+            text-align: right;
+        }
+
+        #controls input, #controls select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        button {
+            flex: 1;
+            padding: 6px;
+        }
+    </style>
 </head>
 <body>
-    <canvas id="canopy" height="400" width="800" style="background-color:#FFF;"></canvas>
-    <script src="dist/fractal-canopy.js"></script>
+    <canvas id="canopy" height="400" width="800"></canvas>
+    <form id="controls"></form>
+
+    <script src="dist/fractal-canopy.min.js"></script>
     <script>
+        // Describes how to render a control for each CanopyOptions key.
+        // Anything not listed here falls back to a plain number input.
+        var fieldTypes = {
+            startAngle: { type: 'number', step: 0.01 },
+            branchSpread: { type: 'number', step: 0.01 },
+            spreadJitter: { type: 'number', step: 0.01 },
+            lengthScale: { type: 'number', step: 0.01, min: 0, max: 1 },
+            widthScale: { type: 'number', step: 0.01, min: 0, max: 1 },
+            maxDepth: { type: 'number', step: 1, min: 0 },
+            leafDepth: { type: 'number', step: 1, min: 0 },
+            branchColor: { type: 'text' },
+            leafColor: { type: 'text' },
+            lineCap: { type: 'select', options: ['butt', 'round', 'square'] }
+        };
+
         var canvas = document.getElementById('canopy');
         var ctx = canvas.getContext('2d');
+        var form = document.getElementById('controls');
+        var defaults = FractalCanopy.Canopy.defaults;
+        var inputs = {};
 
-        var canopy = new Canopy(ctx);
-        canopy.RenderCanopy();
+        Object.keys(defaults).forEach(function (key) {
+            var field = fieldTypes[key] || { type: 'number', step: 1 };
+
+            var label = document.createElement('label');
+            label.htmlFor = key;
+            label.textContent = key;
+            form.appendChild(label);
+
+            var input;
+            if (field.type === 'select') {
+                input = document.createElement('select');
+                field.options.forEach(function (option) {
+                    var opt = document.createElement('option');
+                    opt.value = option;
+                    opt.textContent = option;
+                    input.appendChild(opt);
+                });
+                input.value = defaults[key];
+            } else {
+                input = document.createElement('input');
+                input.type = field.type;
+                if (field.step !== undefined) input.step = field.step;
+                if (field.min !== undefined) input.min = field.min;
+                if (field.max !== undefined) input.max = field.max;
+                input.value = defaults[key];
+            }
+            input.id = key;
+            input.name = key;
+            input.addEventListener('input', render);
+            form.appendChild(input);
+
+            inputs[key] = { el: input, isNumber: field.type === 'number' };
+        });
+
+        var actions = document.createElement('div');
+        actions.id = 'actions';
+
+        var redrawButton = document.createElement('button');
+        redrawButton.type = 'button';
+        redrawButton.textContent = 'Redraw';
+        redrawButton.title = 'Re-render with the same options (branch jitter is randomised each time)';
+        redrawButton.addEventListener('click', render);
+        actions.appendChild(redrawButton);
+
+        var resetButton = document.createElement('button');
+        resetButton.type = 'button';
+        resetButton.textContent = 'Reset to defaults';
+        resetButton.addEventListener('click', function () {
+            Object.keys(defaults).forEach(function (key) {
+                inputs[key].el.value = defaults[key];
+            });
+            render();
+        });
+        actions.appendChild(resetButton);
+
+        form.appendChild(actions);
+
+        function readOptions() {
+            var options = {};
+            Object.keys(inputs).forEach(function (key) {
+                var input = inputs[key];
+                options[key] = input.isNumber ? parseFloat(input.el.value) : input.el.value;
+            });
+            return options;
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            var canopy = new FractalCanopy.Canopy(ctx, readOptions());
+            canopy.RenderCanopy();
+        }
+
+        render();
     </script>
 </body>
 </html>

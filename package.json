@@ -1,25 +1,62 @@
 {
-  "author": "Nattrass",
+  "name": "fractal-canopy",
+  "version": "0.2.0",
   "description": "Fractal Canopy Javascript Library",
-  "repository": "https://github.com/nattrass/fractal-canopy.js",
+  "author": "Nattrass",
   "license": "MIT",
-  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/fractal-canopy.cjs",
+  "module": "./dist/fractal-canopy.js",
+  "types": "./dist/fractal-canopy.d.ts",
+  "unpkg": "./dist/fractal-canopy.min.js",
+  "jsdelivr": "./dist/fractal-canopy.min.js",
+  "exports": {
+    ".": {
+      "types": "./dist/fractal-canopy.d.ts",
+      "import": "./dist/fractal-canopy.js",
+      "require": "./dist/fractal-canopy.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "fractal",
+    "canopy",
+    "canvas",
+    "tree",
+    "generative-art",
+    "svg-alternative",
+    "html5-canvas"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nattrass/fractal-canopy.js.git"
+  },
+  "homepage": "https://github.com/nattrass/fractal-canopy.js",
+  "bugs": {
+    "url": "https://github.com/nattrass/fractal-canopy.js/issues"
+  },
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "build": "grunt",
-    "watch": "grunt watch",
-    "lint": "grunt jshint"
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "grunt": "^1.6.3",
-    "grunt-contrib-clean": "^2.0.1",
-    "grunt-contrib-concat": "^2.1.0",
-    "grunt-contrib-jshint": "^3.2.0",
-    "grunt-contrib-uglify": "^5.2.2",
-    "grunt-contrib-watch": "^1.1.0",
-    "jest": "^29.7.0"
+    "@vitest/coverage-v8": "^4.1.10",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "minimatch": "^3.1.5",

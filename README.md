@@ -8,43 +8,44 @@ JavaScript library for rendering a [Fractal Canopy](https://en.wikipedia.org/wik
 
 A fractal canopy is a fractal structure that resembles a tree canopy. This library provides an easy way to generate and display these beautiful recursive patterns on an HTML5 canvas.
 
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) (for development and building)
-
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/nattrass/fractal-canopy.js.git
-   cd fractal-canopy.js
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Build the project:
-   ```bash
-   npm run build
-   ```
+```bash
+npm install fractal-canopy
+```
 
 ## Getting Started
 
-Include the `dist/fractal-canopy.js` file in your HTML and grab a 2D context from a canvas:
+### ESM / bundlers
+
+```js
+import { Canopy } from 'fractal-canopy';
+
+const canvas = document.getElementById('canopy');
+const ctx = canvas.getContext('2d');
+
+const canopy = new Canopy(ctx);
+canopy.RenderCanopy();
+```
+
+The package ships CommonJS and TypeScript types too, so `require('fractal-canopy')` and full autocomplete/type-checking both work out of the box.
+
+### `<script>` tag / CDN
 
 ```html
 <canvas id="canopy" height="400" width="800" style="background-color:#FFF;"></canvas>
-<script src="dist/fractal-canopy.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fractal-canopy/dist/fractal-canopy.min.js"></script>
+<!-- or: https://unpkg.com/fractal-canopy/dist/fractal-canopy.min.js -->
 <script>
     var canvas = document.getElementById('canopy');
     var ctx = canvas.getContext('2d');
 
-    var canopy = new Canopy(ctx);
+    var canopy = new FractalCanopy.Canopy(ctx);
     canopy.RenderCanopy();
 </script>
 ```
+
+> **Note:** as of `0.2.0` the browser build exposes a `FractalCanopy` namespace global (`FractalCanopy.Canopy`) instead of a bare `Canopy` global.
 
 ### Basic Usage
 
@@ -57,7 +58,7 @@ Include the `dist/fractal-canopy.js` file in your HTML and grab a 2D context fro
 Anything you leave out keeps its default value.
 
 ```js
-var canopy = new Canopy(ctx, {
+const canopy = new Canopy(ctx, {
     originX: 200,
     originY: 400,
     maxDepth: 9,
@@ -84,43 +85,28 @@ The defaults are exposed as `Canopy.defaults`.
 
 ## Development
 
-This project uses Grunt to automate build tasks:
+The library is written in TypeScript and built with [tsup](https://tsup.egoist.dev/), which emits ESM, CommonJS, a minified IIFE for `<script>`/CDN use, and `.d.ts` type declarations.
 
-- `npm run build` - Build the project (minified and unminified versions)
-- `npm run watch` - Watch source files and rebuild on changes
-- `npm run lint` - Lint JavaScript files
+```bash
+git clone https://github.com/nattrass/fractal-canopy.js.git
+cd fractal-canopy.js
+npm install
+npm run build
+```
 
-The Gruntfile.js contains all build configuration.
+- `npm run build` - Build ESM, CJS, IIFE and type declarations into `dist/`
+- `npm run dev` - Rebuild on changes
+- `npm run typecheck` - Type-check the project with `tsc --noEmit`
 
 ## Testing
 
-This project uses Jest for unit testing:
+This project uses [Vitest](https://vitest.dev/) for unit testing:
 
 - `npm test` - Run all tests
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:coverage` - Run tests with code coverage report
 
-Test files are located in the `tests/` directory with the `.test.js` extension.
-
-### Running Tests
-
-After installing dependencies, you can run the test suite:
-
-```bash
-npm test
-```
-
-View code coverage:
-
-```bash
-npm run test:coverage
-```
-
-Watch mode for development (re-runs tests on file changes):
-
-```bash
-npm run test:watch
-```
+Test files are located in the `tests/` directory with the `.test.ts` extension.
 
 ## License
 

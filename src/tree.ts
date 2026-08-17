@@ -1,16 +1,64 @@
-const CoordinateClass = typeof module !== 'undefined' && module.exports ? require('./coordinate') : Coordinate;
+import { Coordinate } from './coordinate';
 
-class Canopy {
-    constructor(ctx, options) {
+export interface CanopyOptions {
+    originX: number;
+    originY: number;
+    startAngle: number;
+    trunkLength: number;
+    trunkWidth: number;
+    branchLength: number;
+    branchWidth: number;
+    lengthScale: number;
+    widthScale: number;
+    branchSpread: number;
+    spreadJitter: number;
+    maxDepth: number;
+    leafDepth: number;
+    branchColor: string;
+    leafColor: string;
+    lineCap: CanvasLineCap;
+}
+
+interface Branch {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+}
+
+export class Canopy {
+    static defaults: CanopyOptions = {
+        originX: 400,
+        originY: 400,
+        startAngle: Math.PI,
+        trunkLength: 100,
+        trunkWidth: 20,
+        branchLength: 75,
+        branchWidth: 20,
+        lengthScale: 0.75,
+        widthScale: 0.6,
+        branchSpread: (2 * Math.PI) / 11,
+        spreadJitter: 1,
+        maxDepth: 11,
+        leafDepth: 5,
+        branchColor: 'Black',
+        leafColor: 'Green',
+        lineCap: 'round'
+    };
+
+    ctx: CanvasRenderingContext2D;
+    options: CanopyOptions;
+
+    constructor(ctx: CanvasRenderingContext2D, options?: Partial<CanopyOptions>) {
         this.ctx = ctx;
         this.options = Object.assign({}, Canopy.defaults, options);
     }
 
-    RenderCanopy() {
+    RenderCanopy(): void {
         const ctx = this.ctx;
         const options = this.options;
-        const base = new CoordinateClass(options.originX, options.originY);
-        const crown = new CoordinateClass(base.x, base.y - options.trunkLength);
+        const base = new Coordinate(options.originX, options.originY);
+        const crown = new Coordinate(base.x, base.y - options.trunkLength);
         const levels = this.GrowBranches(crown);
 
         ctx.save();
@@ -46,11 +94,11 @@ class Canopy {
 
     // Walks the fractal and returns the branch geometry bucketed by depth,
     // where levels[depth] holds every branch grown at that depth.
-    GrowBranches(crown) {
+    GrowBranches(crown: Coordinate): Branch[][] {
         const options = this.options;
-        const levels = [];
+        const levels: Branch[][] = [];
 
-        const grow = (x, y, length, angle, depth) => {
+        const grow = (x: number, y: number, length: number, angle: number, depth: number): void => {
             if (depth >= options.maxDepth) {
                 return;
             }
@@ -76,27 +124,4 @@ class Canopy {
 
         return levels;
     }
-}
-
-Canopy.defaults = {
-    originX: 400,
-    originY: 400,
-    startAngle: Math.PI,
-    trunkLength: 100,
-    trunkWidth: 20,
-    branchLength: 75,
-    branchWidth: 20,
-    lengthScale: 0.75,
-    widthScale: 0.6,
-    branchSpread: (2 * Math.PI) / 11,
-    spreadJitter: 1,
-    maxDepth: 11,
-    leafDepth: 5,
-    branchColor: 'Black',
-    leafColor: 'Green',
-    lineCap: 'round'
-};
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Canopy;
 }

@@ -1,4 +1,5 @@
-const Coordinate = require('../src/coordinate');
+import { describe, it, expect } from 'vitest';
+import { Coordinate } from '../src/coordinate';
 
 describe('Coordinate', () => {
     describe('constructor', () => {
