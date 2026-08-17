@@ -14,7 +14,14 @@
 
     <main>
         <section id="stage">
-            <canvas id="canopy" width="800" height="400"></canvas>
+            <div id="canvasWrap">
+                <canvas id="canopy" width="800" height="400"></canvas>
+            </div>
+            <div id="zoomControls">
+                <button type="button" id="zoomOut" aria-label="Zoom out">&minus;</button>
+                <button type="button" id="zoomReset" aria-label="Reset zoom" title="Reset zoom">100%</button>
+                <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+            </div>
             <p id="fitNotice" role="status" aria-live="polite"></p>
         </section>
 

@@ -69,12 +69,51 @@ main {
     align-items: center;
 }
 
-canvas {
-    max-width: 100%;
-    height: auto;
+#canvasWrap {
+    width: 100%;
+    max-width: 800px;
+    overflow: hidden;
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 6px;
+    cursor: grab;
+    touch-action: none;
+}
+
+#canvasWrap.dragging {
+    cursor: grabbing;
+}
+
+canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    transform-origin: 0 0;
+}
+
+#zoomControls {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+#zoomControls button {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--fg);
+    cursor: pointer;
+}
+
+#zoomControls button:hover {
+    border-color: var(--accent);
+}
+
+#zoomReset {
+    min-width: 56px;
+    font-variant-numeric: tabular-nums;
 }
 
 #fitNotice {

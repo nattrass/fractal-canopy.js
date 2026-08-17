@@ -31,6 +31,7 @@
 
     var canvas = document.getElementById('canopy');
     var ctx = canvas.getContext('2d');
+    var canvasWrap = document.getElementById('canvasWrap');
     var form = document.getElementById('controls');
     var statusEl = document.getElementById('status');
     var fitNoticeEl = document.getElementById('fitNotice');
@@ -726,8 +727,144 @@
         copyTextToClipboard(location.href, 'Link copied to clipboard');
     }
 
+    // --- Pan / zoom ----------------------------------------------------
+    // A CSS transform on the already-rendered <canvas> element, not a redraw
+    // — so it's entirely independent of render() and persists across slider/
+    // preset/seed changes with no extra wiring needed there.
+    var ZOOM_MIN = 1;
+    var ZOOM_MAX = 6;
+    var ZOOM_WHEEL_FACTOR = 1.15;
+    var ZOOM_BUTTON_FACTOR = 1.4;
+
+    var zoomResetBtn = document.getElementById('zoomReset');
+    var zoom = 1;
+    var panX = 0;
+    var panY = 0;
+
+    function applyZoomTransform() {
+        canvas.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoom + ')';
+        zoomResetBtn.textContent = Math.round(zoom * 100) + '%';
+    }
+
+    // Zooms toward (anchorX, anchorY) — a point in canvasWrap-local pixels —
+    // so whatever's under that point stays put as the scale changes, the same
+    // way scroll-to-zoom works in image viewers and maps.
+    function zoomTo(newZoom, anchorX, anchorY) {
+        newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newZoom));
+        if (newZoom === zoom) return;
+
+        var localX = (anchorX - panX) / zoom;
+        var localY = (anchorY - panY) / zoom;
+
+        zoom = newZoom;
+        panX = anchorX - localX * zoom;
+        panY = anchorY - localY * zoom;
+        applyZoomTransform();
+    }
+
+    function zoomAtCenter(factor) {
+        var rect = canvasWrap.getBoundingClientRect();
+        zoomTo(zoom * factor, rect.width / 2, rect.height / 2);
+    }
+
+    function resetZoom() {
+        zoom = 1;
+        panX = 0;
+        panY = 0;
+        applyZoomTransform();
+    }
+
+    var dragging = false;
+    var dragStartX = 0;
+    var dragStartY = 0;
+    var dragStartPanX = 0;
+    var dragStartPanY = 0;
+
+    function startDrag(clientX, clientY) {
+        dragging = true;
+        dragStartX = clientX;
+        dragStartY = clientY;
+        dragStartPanX = panX;
+        dragStartPanY = panY;
+        canvasWrap.classList.add('dragging');
+    }
+
+    function moveDrag(clientX, clientY) {
+        if (!dragging) return;
+        panX = dragStartPanX + (clientX - dragStartX);
+        panY = dragStartPanY + (clientY - dragStartY);
+        applyZoomTransform();
+    }
+
+    function endDrag() {
+        dragging = false;
+        canvasWrap.classList.remove('dragging');
+    }
+
+    function touchDistance(touches) {
+        var dx = touches[0].clientX - touches[1].clientX;
+        var dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    var pinchStartDist = 0;
+    var pinchStartZoom = 1;
+
+    function initZoomControls() {
+        canvasWrap.addEventListener('wheel', function (event) {
+            event.preventDefault();
+            var rect = canvasWrap.getBoundingClientRect();
+            var factor = event.deltaY < 0 ? ZOOM_WHEEL_FACTOR : 1 / ZOOM_WHEEL_FACTOR;
+            zoomTo(zoom * factor, event.clientX - rect.left, event.clientY - rect.top);
+        }, { passive: false });
+
+        document.getElementById('zoomIn').addEventListener('click', function () {
+            zoomAtCenter(ZOOM_BUTTON_FACTOR);
+        });
+        document.getElementById('zoomOut').addEventListener('click', function () {
+            zoomAtCenter(1 / ZOOM_BUTTON_FACTOR);
+        });
+        zoomResetBtn.addEventListener('click', resetZoom);
+
+        canvasWrap.addEventListener('mousedown', function (event) {
+            startDrag(event.clientX, event.clientY);
+        });
+        window.addEventListener('mousemove', function (event) {
+            moveDrag(event.clientX, event.clientY);
+        });
+        window.addEventListener('mouseup', endDrag);
+
+        // Single-finger drag pans; two-finger pinch zooms (anchored on the
+        // midpoint between the two touches). touch-action:none on
+        // canvasWrap (see CSS) stops the page itself from scrolling/zooming
+        // underneath these.
+        canvasWrap.addEventListener('touchstart', function (event) {
+            if (event.touches.length === 1) {
+                startDrag(event.touches[0].clientX, event.touches[0].clientY);
+            } else if (event.touches.length === 2) {
+                dragging = false;
+                pinchStartDist = touchDistance(event.touches);
+                pinchStartZoom = zoom;
+            }
+        }, { passive: true });
+
+        canvasWrap.addEventListener('touchmove', function (event) {
+            if (event.touches.length === 1 && dragging) {
+                moveDrag(event.touches[0].clientX, event.touches[0].clientY);
+            } else if (event.touches.length === 2 && pinchStartDist > 0) {
+                var rect = canvasWrap.getBoundingClientRect();
+                var midX = (event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left;
+                var midY = (event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top;
+                zoomTo(pinchStartZoom * (touchDistance(event.touches) / pinchStartDist), midX, midY);
+            }
+        }, { passive: true });
+
+        canvasWrap.addEventListener('touchend', endDrag);
+    }
+
     buildControls();
     buildPresetPicker();
+    initZoomControls();
     if (!applyStateFromHash()) {
         applyOptions(defaultsAsHex());
         render();
