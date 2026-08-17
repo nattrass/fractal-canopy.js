@@ -184,21 +184,26 @@
     //
     // drawCanopy below deliberately mirrors Canopy.RenderCanopy() in
     // src/tree.ts branch-for-branch (including the CURVE_BOW_FRACTION/
-    // LEAF_BLOB_*/LEAF_LIGHT_*/LEAF_*_ALPHA constants and hashToUnit helper)
-    // rather than calling it directly, because RenderCanopy always calls
-    // GrowBranches again itself — using it here would consume a second,
-    // separately-jittered tree for drawing than the one bounds were computed
-    // from. Keep the two in sync by hand if tree.ts's rendering ever changes.
+    // LEAF_*_FACTOR/LEAF_*_ALPHA/LEAF_BLOB_* constants, drawLeaf and
+    // hashToUnit) rather than calling it directly, because RenderCanopy
+    // always calls GrowBranches again itself — using it here would consume a
+    // second, separately-jittered tree for drawing than the one bounds were
+    // computed from. Keep the two in sync by hand if tree.ts's rendering ever
+    // changes.
     var FIT_PADDING = 16;
     var CURVE_BOW_FRACTION = 0.26;
     var LEAF_BLOBS_MIN = 2;
     var LEAF_BLOBS_RANGE = 2;
-    var LEAF_BLOB_MIN_RADIUS = 2;
-    var LEAF_BLOB_RADIUS_RANGE = 3;
+    var LEAF_SIZE_MIN = 2;
+    var LEAF_SIZE_RANGE = 3;
+    var LEAF_LENGTH_FACTOR = 2.4;
+    var LEAF_WIDTH_FACTOR = 1.3;
     var LEAF_BLOB_SPREAD = 6;
     var LEAF_LIGHT_OFFSET_FRACTION = 0.35;
     var LEAF_HIGHLIGHT_ALPHA = 0.55;
     var LEAF_SHADOW_ALPHA = 0.3;
+    var LEAF_VEIN_ALPHA = 0.25;
+    var LEAF_VEIN_WIDTH = 0.5;
 
     function hashToUnit(n) {
         var x = Math.sin(n) * 43758.5453123;
@@ -234,7 +239,8 @@
             margin = Math.max(margin, options.branchCurve * Math.max(options.trunkLength, options.branchLength) * CURVE_BOW_FRACTION);
         }
         if (options.leafStyle === 'cluster') {
-            margin = Math.max(margin, LEAF_BLOB_SPREAD + LEAF_BLOB_MIN_RADIUS + LEAF_BLOB_RADIUS_RANGE);
+            var maxLeafHalfLength = ((LEAF_SIZE_MIN + LEAF_SIZE_RANGE) * LEAF_LENGTH_FACTOR) / 2;
+            margin = Math.max(margin, LEAF_BLOB_SPREAD + maxLeafHalfLength);
         }
         return margin;
     }
@@ -343,30 +349,56 @@
             for (var b = 0; b < blobCount; b++) {
                 var angle = hashToUnit(tipSeed + b * 17.31 + 1.1) * Math.PI * 2;
                 var dist = hashToUnit(tipSeed + b * 17.31 + 2.2) * LEAF_BLOB_SPREAD;
-                var radius = LEAF_BLOB_MIN_RADIUS + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_BLOB_RADIUS_RANGE;
-                var blobX = tipX + Math.cos(angle) * dist;
-                var blobY = tipY + Math.sin(angle) * dist;
+                var size = LEAF_SIZE_MIN + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_SIZE_RANGE;
+                var rotation = hashToUnit(tipSeed + b * 17.31 + 4.4) * Math.PI * 2;
 
-                ctx.beginPath();
-                ctx.arc(blobX, blobY, radius, 0, Math.PI * 2);
-                ctx.fillStyle = options.leafColor;
-                ctx.fill();
-
-                var shading = ctx.createRadialGradient(
-                    blobX - radius * LEAF_LIGHT_OFFSET_FRACTION,
-                    blobY - radius * LEAF_LIGHT_OFFSET_FRACTION,
-                    0,
-                    blobX,
-                    blobY,
-                    radius
-                );
-                shading.addColorStop(0, 'rgba(255, 255, 255, ' + LEAF_HIGHLIGHT_ALPHA + ')');
-                shading.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-                shading.addColorStop(1, 'rgba(0, 0, 0, ' + LEAF_SHADOW_ALPHA + ')');
-                ctx.fillStyle = shading;
-                ctx.fill();
+                drawLeaf(options, tipX + Math.cos(angle) * dist, tipY + Math.sin(angle) * dist, size, rotation);
             }
         }
+    }
+
+    // A single leaf: a pointed-oval outline (two quadratic bows sharing a tip
+    // and a base) rather than a circle, drawn in local space and rotated/
+    // translated into place via the canvas transform.
+    function drawLeaf(options, x, y, size, rotation) {
+        var halfLength = (size * LEAF_LENGTH_FACTOR) / 2;
+        var halfWidth = (size * LEAF_WIDTH_FACTOR) / 2;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        ctx.beginPath();
+        ctx.moveTo(0, -halfLength);
+        ctx.quadraticCurveTo(halfWidth, 0, 0, halfLength);
+        ctx.quadraticCurveTo(-halfWidth, 0, 0, -halfLength);
+        ctx.closePath();
+
+        ctx.fillStyle = options.leafColor;
+        ctx.fill();
+
+        var shading = ctx.createRadialGradient(
+            -halfWidth * LEAF_LIGHT_OFFSET_FRACTION,
+            -halfLength * LEAF_LIGHT_OFFSET_FRACTION,
+            0,
+            0,
+            0,
+            Math.max(halfLength, halfWidth)
+        );
+        shading.addColorStop(0, 'rgba(255, 255, 255, ' + LEAF_HIGHLIGHT_ALPHA + ')');
+        shading.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+        shading.addColorStop(1, 'rgba(0, 0, 0, ' + LEAF_SHADOW_ALPHA + ')');
+        ctx.fillStyle = shading;
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, ' + LEAF_VEIN_ALPHA + ')';
+        ctx.lineWidth = LEAF_VEIN_WIDTH;
+        ctx.beginPath();
+        ctx.moveTo(0, -halfLength * 0.85);
+        ctx.lineTo(0, halfLength * 0.85);
+        ctx.stroke();
+
+        ctx.restore();
     }
 
     function drawCanopy(options, base, crown, levels) {

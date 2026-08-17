@@ -53,11 +53,17 @@ const CURVE_BOW_FRACTION = 0.26;
 
 // Leaf cluster blob sizing, in canvas units — tuned by eye, not derived from
 // any option, since they're a fixed rendering flourish rather than a
-// geometry-affecting parameter.
+// geometry-affecting parameter. Each leaf is a pointed-oval outline (two
+// quadratic bows meeting at a tip and a base — see drawLeafClusters), sized
+// as a length/width pair derived from a single random "size" value rather
+// than an independent length and width, so bigger leaves scale up as a whole
+// rather than independently stretching.
 const LEAF_BLOBS_MIN = 2;
 const LEAF_BLOBS_RANGE = 2;
-const LEAF_BLOB_MIN_RADIUS = 2;
-const LEAF_BLOB_RADIUS_RANGE = 3;
+const LEAF_SIZE_MIN = 2;
+const LEAF_SIZE_RANGE = 3;
+const LEAF_LENGTH_FACTOR = 2.4;
+const LEAF_WIDTH_FACTOR = 1.3;
 const LEAF_BLOB_SPREAD = 6;
 
 // Shading for leaf blobs: a radial gradient overlay, highlight offset toward
@@ -68,6 +74,10 @@ const LEAF_BLOB_SPREAD = 6;
 const LEAF_LIGHT_OFFSET_FRACTION = 0.35;
 const LEAF_HIGHLIGHT_ALPHA = 0.55;
 const LEAF_SHADOW_ALPHA = 0.3;
+
+// A faint centre vein, tip to base.
+const LEAF_VEIN_ALPHA = 0.25;
+const LEAF_VEIN_WIDTH = 0.5;
 
 // Stateless pseudo-random hash (the classic "sin scramble" trick): maps any
 // number to a pseudo-random value in [0, 1), deterministic for a given input
@@ -241,30 +251,61 @@ export class Canopy {
             for (let b = 0; b < blobCount; b++) {
                 const angle = hashToUnit(tipSeed + b * 17.31 + 1.1) * Math.PI * 2;
                 const dist = hashToUnit(tipSeed + b * 17.31 + 2.2) * LEAF_BLOB_SPREAD;
-                const radius = LEAF_BLOB_MIN_RADIUS + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_BLOB_RADIUS_RANGE;
-                const blobX = tipX + Math.cos(angle) * dist;
-                const blobY = tipY + Math.sin(angle) * dist;
+                const size = LEAF_SIZE_MIN + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_SIZE_RANGE;
+                const rotation = hashToUnit(tipSeed + b * 17.31 + 4.4) * Math.PI * 2;
 
-                ctx.beginPath();
-                ctx.arc(blobX, blobY, radius, 0, Math.PI * 2);
-                ctx.fillStyle = options.leafColor;
-                ctx.fill();
-
-                const shading = ctx.createRadialGradient(
-                    blobX - radius * LEAF_LIGHT_OFFSET_FRACTION,
-                    blobY - radius * LEAF_LIGHT_OFFSET_FRACTION,
-                    0,
-                    blobX,
-                    blobY,
-                    radius
-                );
-                shading.addColorStop(0, `rgba(255, 255, 255, ${LEAF_HIGHLIGHT_ALPHA})`);
-                shading.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-                shading.addColorStop(1, `rgba(0, 0, 0, ${LEAF_SHADOW_ALPHA})`);
-                ctx.fillStyle = shading;
-                ctx.fill();
+                this.drawLeaf(tipX + Math.cos(angle) * dist, tipY + Math.sin(angle) * dist, size, rotation);
             }
         }
+    }
+
+    // A single leaf: a pointed-oval outline (two quadratic bows sharing a tip
+    // and a base, like an eye/almond shape) rather than a circle, since a
+    // plain arc doesn't read as foliage at any size. Drawn in local space
+    // (tip up, base down, centred on the origin) and rotated/translated into
+    // place via the canvas transform, so the path/gradient/vein maths below
+    // never has to do its own trigonometry.
+    private drawLeaf(x: number, y: number, size: number, rotation: number): void {
+        const ctx = this.ctx;
+        const options = this.options;
+        const halfLength = (size * LEAF_LENGTH_FACTOR) / 2;
+        const halfWidth = (size * LEAF_WIDTH_FACTOR) / 2;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        ctx.beginPath();
+        ctx.moveTo(0, -halfLength);
+        ctx.quadraticCurveTo(halfWidth, 0, 0, halfLength);
+        ctx.quadraticCurveTo(-halfWidth, 0, 0, -halfLength);
+        ctx.closePath();
+
+        ctx.fillStyle = options.leafColor;
+        ctx.fill();
+
+        const shading = ctx.createRadialGradient(
+            -halfWidth * LEAF_LIGHT_OFFSET_FRACTION,
+            -halfLength * LEAF_LIGHT_OFFSET_FRACTION,
+            0,
+            0,
+            0,
+            Math.max(halfLength, halfWidth)
+        );
+        shading.addColorStop(0, `rgba(255, 255, 255, ${LEAF_HIGHLIGHT_ALPHA})`);
+        shading.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+        shading.addColorStop(1, `rgba(0, 0, 0, ${LEAF_SHADOW_ALPHA})`);
+        ctx.fillStyle = shading;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(0, 0, 0, ${LEAF_VEIN_ALPHA})`;
+        ctx.lineWidth = LEAF_VEIN_WIDTH;
+        ctx.beginPath();
+        ctx.moveTo(0, -halfLength * 0.85);
+        ctx.lineTo(0, halfLength * 0.85);
+        ctx.stroke();
+
+        ctx.restore();
     }
 
     // Draws x1,y1 -> x2,y2 (x1,y1 assumed already the current point via

@@ -7,11 +7,14 @@ function createMockCtx() {
         moveTo: vi.fn(),
         lineTo: vi.fn(),
         quadraticCurveTo: vi.fn(),
+        closePath: vi.fn(),
         arc: vi.fn(),
         fill: vi.fn(),
         stroke: vi.fn(),
         save: vi.fn(),
         restore: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
         createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
         lineWidth: null as number | null,
         strokeStyle: null as string | null,
@@ -519,27 +522,28 @@ describe('Canopy', () => {
     });
 
     describe('leafStyle', () => {
-        it('should never draw blobs (arc/fill) when leafStyle is "line" or omitted', () => {
+        it('should never draw leaf shapes (fill/rotate) when leafStyle is "line" or omitted', () => {
             const canopy = new Canopy(mockCtx as any, { maxDepth: 6, leafDepth: 2 });
             canopy.RenderCanopy();
 
-            expect(mockCtx.arc).not.toHaveBeenCalled();
+            expect(mockCtx.rotate).not.toHaveBeenCalled();
             expect(mockCtx.fill).not.toHaveBeenCalled();
         });
 
-        it('should draw blobs at the outermost tips when leafStyle is "cluster"', () => {
+        it('should draw leaf shapes at the outermost tips when leafStyle is "cluster"', () => {
             const canopy = new Canopy(mockCtx as any, { maxDepth: 6, leafDepth: 2, leafStyle: 'cluster' });
             canopy.RenderCanopy();
 
-            expect(mockCtx.arc).toHaveBeenCalled();
+            expect(mockCtx.rotate).toHaveBeenCalled();
+            expect(mockCtx.quadraticCurveTo).toHaveBeenCalled();
             expect(mockCtx.fill).toHaveBeenCalled();
         });
 
-        it('should draw no blobs in cluster mode when leafDepth never applies (e.g. leafDepth >= maxDepth)', () => {
+        it('should draw no leaf shapes in cluster mode when leafDepth never applies (e.g. leafDepth >= maxDepth)', () => {
             const canopy = new Canopy(mockCtx as any, { maxDepth: 4, leafDepth: 4, leafStyle: 'cluster' });
             canopy.RenderCanopy();
 
-            expect(mockCtx.arc).not.toHaveBeenCalled();
+            expect(mockCtx.rotate).not.toHaveBeenCalled();
         });
     });
 });
