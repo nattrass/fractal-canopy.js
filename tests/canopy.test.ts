@@ -12,6 +12,7 @@ function createMockCtx() {
         stroke: vi.fn(),
         save: vi.fn(),
         restore: vi.fn(),
+        createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
         lineWidth: null as number | null,
         strokeStyle: null as string | null,
         fillStyle: null as string | null,

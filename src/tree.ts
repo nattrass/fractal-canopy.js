@@ -60,6 +60,15 @@ const LEAF_BLOB_MIN_RADIUS = 2;
 const LEAF_BLOB_RADIUS_RANGE = 3;
 const LEAF_BLOB_SPREAD = 6;
 
+// Shading for leaf blobs: a radial gradient overlay, highlight offset toward
+// one consistent light direction (upper-left) fading through transparent to
+// a darker rim. Layered as rgba(white/black) over the flat leafColor fill
+// rather than computed from leafColor itself, so it works identically for
+// any colour (named, hex, whatever) with no colour parsing needed.
+const LEAF_LIGHT_OFFSET_FRACTION = 0.35;
+const LEAF_HIGHLIGHT_ALPHA = 0.55;
+const LEAF_SHADOW_ALPHA = 0.3;
+
 // Stateless pseudo-random hash (the classic "sin scramble" trick): maps any
 // number to a pseudo-random value in [0, 1), deterministic for a given input
 // with no PRNG state to carry around. Used for leaf cluster jitter, where the
@@ -216,7 +225,6 @@ export class Canopy {
         }
 
         const tips = levels[levels.length - 1];
-        ctx.fillStyle = options.leafColor;
 
         for (let i = 0; i < tips.length; i += 4) {
             const tipX = tips[i + 2];
@@ -234,9 +242,26 @@ export class Canopy {
                 const angle = hashToUnit(tipSeed + b * 17.31 + 1.1) * Math.PI * 2;
                 const dist = hashToUnit(tipSeed + b * 17.31 + 2.2) * LEAF_BLOB_SPREAD;
                 const radius = LEAF_BLOB_MIN_RADIUS + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_BLOB_RADIUS_RANGE;
+                const blobX = tipX + Math.cos(angle) * dist;
+                const blobY = tipY + Math.sin(angle) * dist;
 
                 ctx.beginPath();
-                ctx.arc(tipX + Math.cos(angle) * dist, tipY + Math.sin(angle) * dist, radius, 0, Math.PI * 2);
+                ctx.arc(blobX, blobY, radius, 0, Math.PI * 2);
+                ctx.fillStyle = options.leafColor;
+                ctx.fill();
+
+                const shading = ctx.createRadialGradient(
+                    blobX - radius * LEAF_LIGHT_OFFSET_FRACTION,
+                    blobY - radius * LEAF_LIGHT_OFFSET_FRACTION,
+                    0,
+                    blobX,
+                    blobY,
+                    radius
+                );
+                shading.addColorStop(0, `rgba(255, 255, 255, ${LEAF_HIGHLIGHT_ALPHA})`);
+                shading.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+                shading.addColorStop(1, `rgba(0, 0, 0, ${LEAF_SHADOW_ALPHA})`);
+                ctx.fillStyle = shading;
                 ctx.fill();
             }
         }
