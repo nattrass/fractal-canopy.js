@@ -158,12 +158,13 @@ canvas {
     gap: 6px 16px;
 }
 
-/* Colour pickers and the line-cap select read better at full width than
+/* Colour pickers, selects and checkboxes read better at full width than
    squeezed into half a column alongside a dozen sliders — and since they
    don't need the numeric readout a range gets, label + control fit on one
    row instead of range fields' label-above-control layout. */
 #controls .field:has(input[type="color"]),
-#controls .field:has(select) {
+#controls .field:has(select),
+#controls .field:has(input[type="checkbox"]) {
     grid-column: 1 / -1;
     grid-template-columns: 140px 1fr;
 }
@@ -171,6 +172,14 @@ canvas {
 #controls .field:has(input[type="color"]) input[type="color"],
 #controls .field:has(select) select {
     grid-column: 2 / 3;
+}
+
+#controls .field:has(input[type="checkbox"]) input[type="checkbox"] {
+    grid-column: 2 / 3;
+    justify-self: start;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
 }
 
 .field {

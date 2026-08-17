@@ -17,8 +17,13 @@
         { key: 'branchSpread', label: 'Branch spread (rad)', type: 'range', min: 0, max: Math.PI, step: 0.01 },
         { key: 'spreadJitter', label: 'Spread jitter (rad)', type: 'range', min: 0, max: 3, step: 0.01 },
         { key: 'gravity', label: 'Gravity', type: 'range', min: -0.5, max: 1.5, step: 0.01 },
+        { key: 'branchiness', label: 'Branchiness', type: 'range', min: 0, max: 1, step: 0.01 },
+        { key: 'apicalDominance', label: 'Apical dominance', type: 'range', min: 0, max: 1, step: 0.01 },
+        { key: 'branchCurve', label: 'Branch curve', type: 'range', min: 0, max: 1, step: 0.01 },
+        { key: 'massWeightedWidth', label: 'Mass-weighted width', type: 'boolean' },
         { key: 'maxDepth', label: 'Max depth', type: 'range', min: 0, max: 20, step: 1 },
         { key: 'leafDepth', label: 'Leaf depth', type: 'range', min: 0, max: 20, step: 1 },
+        { key: 'leafStyle', label: 'Leaf style', type: 'select', options: ['line', 'cluster'] },
         { key: 'branchColor', label: 'Branch colour', type: 'color' },
         { key: 'leafColor', label: 'Leaf colour', type: 'color' },
         { key: 'lineCap', label: 'Line cap', type: 'select', options: ['round', 'butt', 'square'] }
@@ -92,7 +97,7 @@
                 });
             } else {
                 input = document.createElement('input');
-                input.type = def.type;
+                input.type = def.type === 'boolean' ? 'checkbox' : def.type;
                 if (def.type === 'range') {
                     input.min = def.min;
                     input.max = def.max;
@@ -132,7 +137,11 @@
     // randomise, reset, loading a shared URL) stays in sync the same way.
     function applyOptions(options) {
         optionDefs.forEach(function (def) {
-            controls[def.key].input.value = options[def.key];
+            if (def.type === 'boolean') {
+                controls[def.key].input.checked = !!options[def.key];
+            } else {
+                controls[def.key].input.value = options[def.key];
+            }
             syncOutput(def.key);
         });
         seedInput.value = options.seed !== undefined && options.seed !== null ? String(options.seed) : '';
@@ -141,6 +150,10 @@
     function readOptions() {
         var options = {};
         optionDefs.forEach(function (def) {
+            if (def.type === 'boolean') {
+                options[def.key] = controls[def.key].input.checked;
+                return;
+            }
             var value = controls[def.key].input.value;
             options[def.key] = def.type === 'range' ? parseFloat(value) : value;
         });
@@ -167,10 +180,27 @@
     // the canopy above y=0 (or past the other edges). Rather than guess "safe"
     // slider ranges, work out the tree's actual bounding box every render (via
     // the public GrowBranches, so it's the same random tree we then draw) and
-    // only scale/translate when it would otherwise be clipped. Draws identically
-    // to Canopy.RenderCanopy() — this just wraps those same draw calls in a
-    // transform, since RenderCanopy has no hook for one.
+    // only scale/translate when it would otherwise be clipped.
+    //
+    // drawCanopy below deliberately mirrors Canopy.RenderCanopy() in
+    // src/tree.ts branch-for-branch (including the CURVE_BOW_FRACTION/
+    // LEAF_BLOB_* constants and hashToUnit helper) rather than calling it
+    // directly, because RenderCanopy always calls GrowBranches again itself —
+    // using it here would consume a second, separately-jittered tree for
+    // drawing than the one bounds were computed from. Keep the two in sync by
+    // hand if tree.ts's rendering ever changes.
     var FIT_PADDING = 16;
+    var CURVE_BOW_FRACTION = 0.26;
+    var LEAF_BLOBS_MIN = 2;
+    var LEAF_BLOBS_RANGE = 2;
+    var LEAF_BLOB_MIN_RADIUS = 2;
+    var LEAF_BLOB_RADIUS_RANGE = 3;
+    var LEAF_BLOB_SPREAD = 6;
+
+    function hashToUnit(n) {
+        var x = Math.sin(n) * 43758.5453123;
+        return x - Math.floor(x);
+    }
 
     function computeBounds(base, crown, levels) {
         var minX = Math.min(base.x, crown.x);
@@ -190,6 +220,22 @@
         return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
     }
 
+    // branchCurve/leafStyle:'cluster' can both draw outside a segment's own
+    // straight-line endpoints (a curve's bow, a leaf blob's scatter radius),
+    // so pad the raw geometric bounds conservatively before checking for
+    // overflow — an approximation, not pixel-exact, but errs toward more
+    // padding than needed rather than clipping a blob or curve at the edge.
+    function boundsMargin(options) {
+        var margin = 0;
+        if (options.branchCurve > 0) {
+            margin = Math.max(margin, options.branchCurve * Math.max(options.trunkLength, options.branchLength) * CURVE_BOW_FRACTION);
+        }
+        if (options.leafStyle === 'cluster') {
+            margin = Math.max(margin, LEAF_BLOB_SPREAD + LEAF_BLOB_MIN_RADIUS + LEAF_BLOB_RADIUS_RANGE);
+        }
+        return margin;
+    }
+
     function fitTransform(bounds) {
         var overflows = bounds.minX < 0 || bounds.minY < 0 || bounds.maxX > canvas.width || bounds.maxY > canvas.height;
         if (!overflows) {
@@ -207,16 +253,32 @@
         };
     }
 
-    function drawCanopy(options, base, crown, levels) {
-        ctx.lineCap = options.lineCap;
+    // x1,y1 -> x2,y2 as either a straight line (branchCurve 0, the default)
+    // or a gentle quadratic bow, alternating direction between adjacent
+    // branches via `variant` (consecutive entries in a level are the +1/-1
+    // direction siblings from GrowBranches). Mirrors Canopy's private
+    // drawSegment exactly. Assumes x1,y1 is already the current point
+    // (moveTo'd by the caller).
+    function drawSegment(x1, y1, x2, y2, variant, branchCurve) {
+        if (branchCurve === 0) {
+            ctx.lineTo(x2, y2);
+            return;
+        }
 
-        ctx.beginPath();
-        ctx.lineWidth = options.trunkWidth;
-        ctx.strokeStyle = options.branchColor;
-        ctx.moveTo(base.x, base.y);
-        ctx.lineTo(crown.x, crown.y);
-        ctx.stroke();
+        var dx = x2 - x1;
+        var dy = y2 - y1;
+        var length = Math.hypot(dx, dy) || 1;
+        var sign = (variant / 4) % 2 === 0 ? 1 : -1;
+        var bow = branchCurve * length * CURVE_BOW_FRACTION * sign;
+        var midX = (x1 + x2) / 2 + (-dy / length) * bow;
+        var midY = (y1 + y2) / 2 + (dx / length) * bow;
 
+        ctx.quadraticCurveTo(midX, midY, x2, y2);
+    }
+
+    // Default path: every branch at a depth shares a width and colour, so
+    // each depth is stroked as a single path rather than one path per branch.
+    function drawLevelsUniform(options, levels) {
         for (var depth = 0; depth < levels.length; depth++) {
             ctx.beginPath();
             ctx.lineWidth = options.branchWidth * Math.pow(options.widthScale, depth);
@@ -225,9 +287,87 @@
             var level = levels[depth];
             for (var i = 0; i < level.length; i += 4) {
                 ctx.moveTo(level[i], level[i + 1]);
-                ctx.lineTo(level[i + 2], level[i + 3]);
+                drawSegment(level[i], level[i + 1], level[i + 2], level[i + 3], i, options.branchCurve);
             }
             ctx.stroke();
+        }
+    }
+
+    // massWeightedWidth: one stroke per branch instead, so each branch's
+    // width can reflect its own actual length (via apicalDominance) rather
+    // than a single depth-wide value.
+    function drawLevelsMassWeighted(options, levels) {
+        for (var depth = 0; depth < levels.length; depth++) {
+            var level = levels[depth];
+            var nominalLength = options.branchLength * Math.pow(options.lengthScale, depth);
+            var baseWidth = options.branchWidth * Math.pow(options.widthScale, depth);
+            var strokeStyle = depth >= options.leafDepth ? options.leafColor : options.branchColor;
+
+            for (var i = 0; i < level.length; i += 4) {
+                var x1 = level[i];
+                var y1 = level[i + 1];
+                var x2 = level[i + 2];
+                var y2 = level[i + 3];
+                var actualLength = Math.hypot(x2 - x1, y2 - y1);
+                var widthFactor = nominalLength > 0 ? actualLength / nominalLength : 1;
+
+                ctx.beginPath();
+                ctx.lineWidth = baseWidth * widthFactor;
+                ctx.strokeStyle = strokeStyle;
+                ctx.moveTo(x1, y1);
+                drawSegment(x1, y1, x2, y2, i, options.branchCurve);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // A small filled cluster near each outermost tip, layered on top of the
+    // ordinary coloured twigs. Only applies to the deepest level actually
+    // grown, and only if that level would already be drawn in leafColor.
+    function drawLeafClusters(options, levels) {
+        if (levels.length === 0 || levels.length - 1 < options.leafDepth) {
+            return;
+        }
+
+        var tips = levels[levels.length - 1];
+        ctx.fillStyle = options.leafColor;
+
+        for (var i = 0; i < tips.length; i += 4) {
+            var tipX = tips[i + 2];
+            var tipY = tips[i + 3];
+            var tipSeed = tipX * 12.9898 + tipY * 78.233;
+            var blobCount = LEAF_BLOBS_MIN + Math.floor(hashToUnit(tipSeed) * (LEAF_BLOBS_RANGE + 1));
+
+            for (var b = 0; b < blobCount; b++) {
+                var angle = hashToUnit(tipSeed + b * 17.31 + 1.1) * Math.PI * 2;
+                var dist = hashToUnit(tipSeed + b * 17.31 + 2.2) * LEAF_BLOB_SPREAD;
+                var radius = LEAF_BLOB_MIN_RADIUS + hashToUnit(tipSeed + b * 17.31 + 3.3) * LEAF_BLOB_RADIUS_RANGE;
+
+                ctx.beginPath();
+                ctx.arc(tipX + Math.cos(angle) * dist, tipY + Math.sin(angle) * dist, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    function drawCanopy(options, base, crown, levels) {
+        ctx.lineCap = options.lineCap;
+
+        ctx.beginPath();
+        ctx.lineWidth = options.trunkWidth;
+        ctx.strokeStyle = options.branchColor;
+        ctx.moveTo(base.x, base.y);
+        drawSegment(base.x, base.y, crown.x, crown.y, 0, options.branchCurve);
+        ctx.stroke();
+
+        if (options.massWeightedWidth) {
+            drawLevelsMassWeighted(options, levels);
+        } else {
+            drawLevelsUniform(options, levels);
+        }
+
+        if (options.leafStyle === 'cluster') {
+            drawLeafClusters(options, levels);
         }
     }
 
@@ -239,6 +379,11 @@
         var levels = canopy.GrowBranches(crown);
 
         var bounds = computeBounds(base, crown, levels);
+        var margin = boundsMargin(options);
+        bounds.minX -= margin;
+        bounds.maxX += margin;
+        bounds.minY -= margin;
+        bounds.maxY += margin;
         var transform = fitTransform(bounds);
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -282,7 +427,7 @@
         }
 
         optionDefs.forEach(function (def) {
-            var current = controls[def.key].input.value;
+            var current = def.type === 'boolean' ? controls[def.key].input.checked : controls[def.key].input.value;
             if (valuesDiffer(def, current, baseline[def.key])) {
                 params.set(def.key, String(current));
             }
@@ -349,6 +494,9 @@
             } else if (def.type === 'color') {
                 options[def.key] = toHex(value);
                 appliedAny = true;
+            } else if (def.type === 'boolean') {
+                options[def.key] = value === 'true';
+                appliedAny = true;
             }
         });
 
@@ -399,6 +547,8 @@
                 options[def.key] = randomHex();
             } else if (def.type === 'select') {
                 options[def.key] = def.options[Math.floor(Math.random() * def.options.length)];
+            } else if (def.type === 'boolean') {
+                options[def.key] = Math.random() < 0.5;
             }
         });
         options.seed = generateSeed();

@@ -6,11 +6,15 @@ function createMockCtx() {
         beginPath: vi.fn(),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
+        quadraticCurveTo: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
         stroke: vi.fn(),
         save: vi.fn(),
         restore: vi.fn(),
         lineWidth: null as number | null,
         strokeStyle: null as string | null,
+        fillStyle: null as string | null,
         lineCap: null as string | null
     };
 }
@@ -372,6 +376,169 @@ describe('Canopy', () => {
             expect(randomSpy).toHaveBeenCalled();
 
             randomSpy.mockRestore();
+        });
+    });
+
+    describe('branchiness', () => {
+        it('should produce identical geometry whether branchiness is 1 or omitted', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const omitted = new Canopy(mockCtx as any, { maxDepth: 5 }).GrowBranches({ x: 0, y: 0 });
+            const explicitOne = new Canopy(mockCtx as any, { maxDepth: 5, branchiness: 1 }).GrowBranches({ x: 0, y: 0 });
+
+            expect(omitted).toEqual(explicitOne);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should call random() exactly once per branch (jitter only, no skip-check) when branchiness is 1', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+            const levels = new Canopy(mockCtx as any, { maxDepth: 4, branchiness: 1 }).GrowBranches({ x: 0, y: 0 });
+            const totalBranches = levels.reduce((sum, level) => sum + level.length / 4, 0);
+
+            expect(randomSpy).toHaveBeenCalledTimes(totalBranches);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should collapse to a single unforked path when branchiness is 0', () => {
+            const levels = new Canopy(mockCtx as any, { maxDepth: 5, branchiness: 0 }).GrowBranches({ x: 0, y: 0 });
+
+            levels.forEach(level => {
+                expect(level.length / 4).toBe(1);
+            });
+        });
+
+        it('should produce fewer than a full binary tree of branches for a mid-range branchiness', () => {
+            const levels = new Canopy(mockCtx as any, { maxDepth: 6, branchiness: 0.5, seed: 'acorn' }).GrowBranches({ x: 0, y: 0 });
+
+            const totalBranches = levels.reduce((sum, level) => sum + level.length / 4, 0);
+            const fullBinaryTotal = levels.reduce((sum, _level, depth) => sum + Math.pow(2, depth + 1), 0);
+
+            expect(totalBranches).toBeLessThan(fullBinaryTotal);
+        });
+    });
+
+    describe('apicalDominance', () => {
+        it('should produce identical geometry whether apicalDominance is 0 or omitted', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const omitted = new Canopy(mockCtx as any, { maxDepth: 5 }).GrowBranches({ x: 0, y: 0 });
+            const explicitZero = new Canopy(mockCtx as any, { maxDepth: 5, apicalDominance: 0 }).GrowBranches({ x: 0, y: 0 });
+
+            expect(omitted).toEqual(explicitZero);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should make the all-primary lineage longer than the all-secondary lineage at the same depth', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const levels = new Canopy(mockCtx as any, { maxDepth: 4, apicalDominance: 1 }).GrowBranches({ x: 0, y: 0 });
+            const deepest = levels[levels.length - 1];
+
+            // Levels fill depth-first: two siblings sharing a parent (adjacent
+            // pairs in the array) are always equal length, since apicalDominance
+            // only affects a branch's *children*, not the branch itself — the
+            // divergence only shows up comparing genuinely different lineages.
+            // The first entry is the lineage that took the primary (i=0) child
+            // at every fork; the last entry took secondary (i=1) every time.
+            const allPrimary = { x1: deepest[0], y1: deepest[1], x2: deepest[2], y2: deepest[3] };
+            const lastOffset = deepest.length - 4;
+            const allSecondary = { x1: deepest[lastOffset], y1: deepest[lastOffset + 1], x2: deepest[lastOffset + 2], y2: deepest[lastOffset + 3] };
+
+            const primaryLength = Math.hypot(allPrimary.x2 - allPrimary.x1, allPrimary.y2 - allPrimary.y1);
+            const secondaryLength = Math.hypot(allSecondary.x2 - allSecondary.x1, allSecondary.y2 - allSecondary.y1);
+
+            expect(primaryLength).toBeGreaterThan(secondaryLength);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should not let a dominant lineage get cut off before its own length threshold', () => {
+            // A high apicalDominance makes the primary lineage's effective decay
+            // much slower than the raw lengthScale — depthLimit must account for
+            // that, or the primary lineage would vanish before shrinking below
+            // MIN_BRANCH_LENGTH.
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 30, apicalDominance: 1, lengthScale: 0.6 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            expect(levels.length).toBeGreaterThan(0);
+            expect(levels[levels.length - 1].length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('branchCurve', () => {
+        it('should draw straight lines (lineTo, never quadraticCurveTo) when branchCurve is 0 or omitted', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 3 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.quadraticCurveTo).not.toHaveBeenCalled();
+            expect(mockCtx.lineTo).toHaveBeenCalled();
+        });
+
+        it('should draw curves (quadraticCurveTo, never lineTo) when branchCurve is set', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 3, branchCurve: 0.5 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.quadraticCurveTo).toHaveBeenCalled();
+            expect(mockCtx.lineTo).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('massWeightedWidth', () => {
+        it('should stroke once per depth (unchanged) when massWeightedWidth is false or omitted', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 4 });
+            canopy.RenderCanopy();
+
+            // 1 trunk stroke + 1 per depth, exactly like the existing (pre-this-
+            // option) batched-per-depth behaviour.
+            expect(mockCtx.stroke).toHaveBeenCalledTimes(5);
+        });
+
+        it('should stroke once per branch, with widths that vary by actual length, when enabled with apicalDominance', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const widths: number[] = [];
+            const recordingCtx = Object.assign(createMockCtx(), {
+                stroke: vi.fn(() => widths.push(recordingCtx.lineWidth as number))
+            });
+
+            new Canopy(recordingCtx as any, { maxDepth: 3, apicalDominance: 1, massWeightedWidth: true }).RenderCanopy();
+
+            // Far more than one stroke per depth (one per branch instead), and
+            // not every recorded width is identical (primary vs secondary
+            // branches differ in actual length, hence width).
+            expect(widths.length).toBeGreaterThan(4);
+            expect(new Set(widths).size).toBeGreaterThan(1);
+
+            randomSpy.mockRestore();
+        });
+    });
+
+    describe('leafStyle', () => {
+        it('should never draw blobs (arc/fill) when leafStyle is "line" or omitted', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 6, leafDepth: 2 });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.arc).not.toHaveBeenCalled();
+            expect(mockCtx.fill).not.toHaveBeenCalled();
+        });
+
+        it('should draw blobs at the outermost tips when leafStyle is "cluster"', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 6, leafDepth: 2, leafStyle: 'cluster' });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.arc).toHaveBeenCalled();
+            expect(mockCtx.fill).toHaveBeenCalled();
+        });
+
+        it('should draw no blobs in cluster mode when leafDepth never applies (e.g. leafDepth >= maxDepth)', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 4, leafDepth: 4, leafStyle: 'cluster' });
+            canopy.RenderCanopy();
+
+            expect(mockCtx.arc).not.toHaveBeenCalled();
         });
     });
 });

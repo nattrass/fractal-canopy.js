@@ -10,6 +10,8 @@ JavaScript library for rendering a [Fractal Canopy](https://en.wikipedia.org/wik
 
 ![A Fractal Canopy](fractal-canopy.png)
 
+*Rendered with the [organic quality options](#organic-quality-options) (`branchiness`, `apicalDominance`, `branchCurve`, `massWeightedWidth`, `leafStyle: 'cluster'`) &mdash; the library's plain defaults are more of a bare wireframe fractal; see [Getting Started](#getting-started).*
+
 ## About
 
 A fractal canopy is a fractal structure that resembles a tree canopy. This library provides an easy way to generate and display these beautiful recursive patterns on an HTML5 canvas.
@@ -83,13 +85,35 @@ canopy.RenderCanopy();
 | `branchSpread` | `2π / 11` | Angle between a pair of branches, in radians |
 | `spreadJitter` | `1` | Maximum random extra spread, in radians |
 | `gravity` | `0` | Bends branches toward straight down, scaled by depth so outer branches droop more than inner ones. `0` leaves the geometry untouched; positive values droop (willow-like); negative values exaggerate the upward lean instead |
+| `branchiness` | `1` | Probability a fork grows a second (side) branch as well as its leader. `1` always forks in two, exactly like before this option existed; lower values give some nodes only one child, for a less uniformly-binary silhouette |
+| `apicalDominance` | `0` | How much more strongly a fork's leader child grows (longer, straighter) than its side child, compounding generation over generation. `0` treats both children identically |
+| `branchCurve` | `0` | Bows each segment into a gentle curve instead of a straight line, alternating direction between siblings. `0` draws straight lines |
+| `massWeightedWidth` | `false` | Derives each branch's width from its own actual length (which `apicalDominance` varies) instead of a single width per depth, so leader branches read as structurally thicker. Mostly only visible when combined with `apicalDominance` |
 | `maxDepth` | `11` | How many times the canopy forks |
 | `leafDepth` | `5` | Depth at which branches switch to the leaf colour |
+| `leafStyle` | `'line'` | `'line'` colours the twigs themselves (the original look); `'cluster'` additionally scatters small filled leaf blobs around the outermost tips |
 | `branchColor` / `leafColor` | `'Black'` / `'Green'` | Stroke colours |
 | `lineCap` | `'round'` | Canvas line cap. Round fills the joint where a branch forks; `'butt'` leaves a visible step |
 | `seed` | `undefined` | Makes the tree deterministic &mdash; see [Deterministic output](#deterministic-output) |
 
-The defaults are exposed as `Canopy.defaults`.
+The defaults are exposed as `Canopy.defaults`, and reproduce the exact same geometry as before these five options existed — they're purely opt-in.
+
+### Organic quality options
+
+`branchiness`, `apicalDominance`, `branchCurve`, `massWeightedWidth` and `leafStyle` exist to make a canopy read as a *tree* rather than a regular binary fractal: irregular branching, a favoured leader limb, gently curved segments, limbs that thicken with what they support, and actual foliage instead of coloured wireframe. They compound with each other (and with `gravity`), so introduce them gradually rather than maxing everything out at once — pushing `apicalDominance` and low `branchiness` and non-zero `gravity` all the way up simultaneously starves the canopy down to one dominant, sweeping limb. A good starting combination:
+
+```js
+const canopy = new Canopy(ctx, {
+    branchiness: 0.85,
+    apicalDominance: 0.35,
+    branchCurve: 0.3,
+    massWeightedWidth: true,
+    leafStyle: 'cluster'
+});
+canopy.RenderCanopy();
+```
+
+The [live playground](https://nattrass.github.io/fractal-canopy.js/playground/) is the fastest way to feel out these ranges interactively.
 
 ### Deterministic output
 
@@ -128,7 +152,6 @@ canopy.RenderCanopy();
 | `cherryBlossom` | Dense, pink-leaved, brown-branched |
 | `bareWinter` | No leaves, thin gnarled branches |
 | `weepingWillow` | Narrow, strong droop, muted green |
-| `conifer` | Tall, narrow evergreen spire |
 | `autumnBlaze` | `classicOak`'s shape in orange/amber |
 
 Try them all in the [live playground](https://nattrass.github.io/fractal-canopy.js/playground/) via the Preset dropdown &mdash; picking one loads its values into every control so you can keep tweaking from there.
