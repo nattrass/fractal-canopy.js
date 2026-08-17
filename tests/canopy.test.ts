@@ -137,6 +137,13 @@ describe('Canopy', () => {
     });
 
     describe('GrowBranches', () => {
+        // Each level is a flat Float64Array of [x1, y1, x2, y2, ...] quadruples,
+        // 4 numbers per branch, rather than an array of branch objects.
+        function branchAt(level: Float64Array, index: number) {
+            const offset = index * 4;
+            return { x1: level[offset], y1: level[offset + 1], x2: level[offset + 2], y2: level[offset + 3] };
+        }
+
         it('should grow one level per depth up to maxDepth', () => {
             const canopy = new Canopy(mockCtx as any, { maxDepth: 4 });
             const levels = canopy.GrowBranches({ x: 0, y: 0 });
@@ -149,7 +156,7 @@ describe('Canopy', () => {
             const levels = canopy.GrowBranches({ x: 0, y: 0 });
 
             levels.forEach((level, depth) => {
-                expect(level.length).toBe(Math.pow(2, depth + 1));
+                expect(level.length / 4).toBe(Math.pow(2, depth + 1));
             });
         });
 
@@ -158,11 +165,13 @@ describe('Canopy', () => {
             const levels = canopy.GrowBranches({ x: 0, y: 0 });
 
             for (let depth = 1; depth < levels.length; depth++) {
-                levels[depth].forEach((branch, index) => {
-                    const parent = levels[depth - 1][Math.floor(index / 2)];
+                const branchCount = levels[depth].length / 4;
+                for (let index = 0; index < branchCount; index++) {
+                    const branch = branchAt(levels[depth], index);
+                    const parent = branchAt(levels[depth - 1], Math.floor(index / 2));
                     expect(branch.x1).toBe(parent.x2);
                     expect(branch.y1).toBe(parent.y2);
-                });
+                }
             }
         });
 
@@ -172,16 +181,33 @@ describe('Canopy', () => {
 
             levels.forEach((level, depth) => {
                 const expected = 100 * Math.pow(0.5, depth);
-                level.forEach(branch => {
+                const branchCount = level.length / 4;
+                for (let index = 0; index < branchCount; index++) {
+                    const branch = branchAt(level, index);
                     const length = Math.hypot(branch.x2 - branch.x1, branch.y2 - branch.y1);
                     expect(length).toBeCloseTo(expected, 6);
-                });
+                }
             });
         });
 
         it('should grow no branches when maxDepth is zero', () => {
             const canopy = new Canopy(mockCtx as any, { maxDepth: 0 });
             expect(canopy.GrowBranches({ x: 0, y: 0 })).toEqual([]);
+        });
+
+        it('should stop recursing once branches drop below one canvas unit long', () => {
+            // branchLength 75, lengthScale 0.75 crosses the 1-unit cutoff around
+            // depth 15, well short of a maxDepth of 30 — this keeps maxDepth
+            // (and therefore time/memory) from growing unboundedly.
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 30 });
+            const levels = canopy.GrowBranches({ x: 0, y: 0 });
+
+            expect(levels.length).toBeLessThan(30);
+
+            const lastLevel = levels[levels.length - 1];
+            const branch = branchAt(lastLevel, 0);
+            const length = Math.hypot(branch.x2 - branch.x1, branch.y2 - branch.y1);
+            expect(length).toBeGreaterThanOrEqual(1);
         });
     });
 

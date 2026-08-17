@@ -19,12 +19,10 @@ export interface CanopyOptions {
     lineCap: CanvasLineCap;
 }
 
-interface Branch {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-}
+// Branch geometry below this length (in canvas units) is imperceptible on
+// screen, so GrowBranches stops recursing rather than spending exponentially
+// more time and memory on segments that wouldn't render visibly anyway.
+const MIN_BRANCH_LENGTH = 1;
 
 export class Canopy {
     static defaults: CanopyOptions = {
@@ -81,9 +79,10 @@ export class Canopy {
             ctx.lineWidth = options.branchWidth * Math.pow(options.widthScale, depth);
             ctx.strokeStyle = depth >= options.leafDepth ? options.leafColor : options.branchColor;
 
-            for (const branch of levels[depth]) {
-                ctx.moveTo(branch.x1, branch.y1);
-                ctx.lineTo(branch.x2, branch.y2);
+            const level = levels[depth];
+            for (let i = 0; i < level.length; i += 4) {
+                ctx.moveTo(level[i], level[i + 1]);
+                ctx.lineTo(level[i + 2], level[i + 3]);
             }
 
             ctx.stroke();
@@ -92,31 +91,58 @@ export class Canopy {
         ctx.restore();
     }
 
-    // Walks the fractal and returns the branch geometry bucketed by depth,
-    // where levels[depth] holds every branch grown at that depth.
-    GrowBranches(crown: Coordinate): Branch[][] {
+    // Walks the fractal and returns the branch geometry bucketed by depth, where
+    // levels[depth] holds every branch grown at that depth as a flat
+    // [x1, y1, x2, y2, x1, y1, x2, y2, ...] Float64Array (4 numbers per branch).
+    //
+    // Branch length only depends on depth (jitter affects angle, not length), so
+    // the exact size of every level is known before growing a single branch.
+    // That lets levels be allocated once as fixed-size typed arrays instead of
+    // push()-ing a plain object per branch, which matters because branch count
+    // doubles every depth: maxDepth 20 is ~2.1 million branches.
+    GrowBranches(crown: Coordinate): Float64Array[] {
         const options = this.options;
-        const levels: Branch[][] = [];
+
+        let depthLimit = 0;
+        let previewLength = options.branchLength;
+        while (depthLimit < options.maxDepth && previewLength >= MIN_BRANCH_LENGTH) {
+            depthLimit++;
+            previewLength *= options.lengthScale;
+        }
+
+        const levels: Float64Array[] = new Array(depthLimit);
+        for (let i = 0; i < depthLimit; i++) {
+            levels[i] = new Float64Array(2 ** (i + 1) * 4);
+        }
+        const cursors = new Uint32Array(depthLimit);
 
         const grow = (x: number, y: number, length: number, angle: number, depth: number): void => {
-            if (depth >= options.maxDepth) {
+            if (depth >= depthLimit) {
                 return;
             }
 
-            if (!levels[depth]) {
-                levels[depth] = [];
-            }
+            const level = levels[depth];
+            const nextLength = length * options.lengthScale;
 
             // A branch forks left (+1) and right (-1) by half the spread, jittered
-            // independently on each side so the canopy grows unevenly.
-            for (const direction of [1, -1]) {
+            // independently on each side so the canopy grows unevenly. Unrolled
+            // rather than looping over [1, -1] to avoid allocating a throwaway
+            // array on every one of the (up to millions of) recursive calls.
+            for (let i = 0; i < 2; i++) {
+                const direction = i === 0 ? 1 : -1;
                 const spread = options.branchSpread + Math.random() * options.spreadJitter;
                 const branchAngle = angle + direction * (spread / 2);
                 const endX = x + length * Math.sin(branchAngle);
                 const endY = y + length * Math.cos(branchAngle);
 
-                levels[depth].push({ x1: x, y1: y, x2: endX, y2: endY });
-                grow(endX, endY, length * options.lengthScale, branchAngle, depth + 1);
+                const offset = cursors[depth];
+                level[offset] = x;
+                level[offset + 1] = y;
+                level[offset + 2] = endX;
+                level[offset + 3] = endY;
+                cursors[depth] = offset + 4;
+
+                grow(endX, endY, nextLength, branchAngle, depth + 1);
             }
         };
 
