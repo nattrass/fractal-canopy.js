@@ -16,6 +16,7 @@
         { key: 'widthScale', label: 'Width scale', type: 'range', min: 0, max: 1, step: 0.01 },
         { key: 'branchSpread', label: 'Branch spread (rad)', type: 'range', min: 0, max: Math.PI, step: 0.01 },
         { key: 'spreadJitter', label: 'Spread jitter (rad)', type: 'range', min: 0, max: 3, step: 0.01 },
+        { key: 'gravity', label: 'Gravity', type: 'range', min: -0.5, max: 1.5, step: 0.01 },
         { key: 'maxDepth', label: 'Max depth', type: 'range', min: 0, max: 20, step: 1 },
         { key: 'leafDepth', label: 'Leaf depth', type: 'range', min: 0, max: 20, step: 1 },
         { key: 'branchColor', label: 'Branch colour', type: 'color' },
@@ -28,6 +29,7 @@
     var form = document.getElementById('controls');
     var statusEl = document.getElementById('status');
     var fitNoticeEl = document.getElementById('fitNotice');
+    var presetSelect = document.getElementById('preset');
     var controls = {};
 
     // ctx.fillStyle normalises any valid CSS colour (named, hex, rgb...) to
@@ -241,6 +243,7 @@
     }
 
     function randomise() {
+        presetSelect.value = '';
         var options = {};
         optionDefs.forEach(function (def) {
             if (def.type === 'range') {
@@ -257,9 +260,52 @@
     }
 
     function resetToDefaults() {
+        presetSelect.value = '';
         applyOptions(defaultsAsHex());
         render();
         showStatus('Reset to defaults');
+    }
+
+    // "classicOak" -> "Classic Oak"
+    function presetLabel(name) {
+        return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, function (c) {
+            return c.toUpperCase();
+        });
+    }
+
+    function buildPresetPicker() {
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Custom — pick a preset…';
+        presetSelect.appendChild(placeholder);
+
+        Object.keys(FractalCanopy.presets).forEach(function (name) {
+            var opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = presetLabel(name);
+            presetSelect.appendChild(opt);
+        });
+
+        presetSelect.addEventListener('change', function () {
+            if (presetSelect.value) applyPreset(presetSelect.value);
+        });
+    }
+
+    // Presets are partial CanopyOptions, same as what you'd hand to
+    // `new FractalCanopy.Canopy(ctx, presets.x)`, so mirror that constructor's
+    // own merge (defaults + preset) rather than layering onto whatever the
+    // controls currently hold.
+    function applyPreset(name) {
+        var preset = FractalCanopy.presets[name];
+        if (!preset) return;
+
+        var merged = Object.assign({}, defaultsAsHex(), preset);
+        if (preset.branchColor) merged.branchColor = toHex(preset.branchColor);
+        if (preset.leafColor) merged.leafColor = toHex(preset.leafColor);
+
+        applyOptions(merged);
+        render();
+        showStatus('Loaded preset: ' + presetLabel(name));
     }
 
     function downloadPng() {
@@ -312,6 +358,7 @@
     }
 
     buildControls();
+    buildPresetPicker();
     applyOptions(defaultsAsHex());
     render();
 

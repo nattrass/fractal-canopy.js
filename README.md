@@ -82,12 +82,42 @@ canopy.RenderCanopy();
 | `lengthScale` / `widthScale` | `0.75` / `0.6` | How much each branch shrinks per depth |
 | `branchSpread` | `2π / 11` | Angle between a pair of branches, in radians |
 | `spreadJitter` | `1` | Maximum random extra spread, in radians |
+| `gravity` | `0` | Bends branches toward straight down, scaled by depth so outer branches droop more than inner ones. `0` leaves the geometry untouched; positive values droop (willow-like); negative values exaggerate the upward lean instead |
 | `maxDepth` | `11` | How many times the canopy forks |
 | `leafDepth` | `5` | Depth at which branches switch to the leaf colour |
 | `branchColor` / `leafColor` | `'Black'` / `'Green'` | Stroke colours |
 | `lineCap` | `'round'` | Canvas line cap. Round fills the joint where a branch forks; `'butt'` leaves a visible step |
 
 The defaults are exposed as `Canopy.defaults`.
+
+### Presets
+
+`presets` is a set of named partial-`CanopyOptions` objects &mdash; each one only overrides the handful of options it needs, and is meant to be passed straight to `Canopy` as-is or as a starting point to tweak further:
+
+```js
+import { Canopy, presets } from 'fractal-canopy';
+
+const canopy = new Canopy(ctx, presets.cherryBlossom);
+canopy.RenderCanopy();
+```
+
+```html
+<script>
+    var canopy = new FractalCanopy.Canopy(ctx, FractalCanopy.presets.weepingWillow);
+    canopy.RenderCanopy();
+</script>
+```
+
+| Preset | Look |
+| --- | --- |
+| `classicOak` | Wide, balanced canopy with a gentle droop |
+| `cherryBlossom` | Dense, pink-leaved, brown-branched |
+| `bareWinter` | No leaves, thin gnarled branches |
+| `weepingWillow` | Narrow, strong droop, muted green |
+| `conifer` | Tall, narrow evergreen spire |
+| `autumnBlaze` | `classicOak`'s shape in orange/amber |
+
+Try them all in the [live playground](https://nattrass.github.io/fractal-canopy.js/playground/) via the Preset dropdown &mdash; picking one loads its values into every control so you can keep tweaking from there.
 
 ## Development
 

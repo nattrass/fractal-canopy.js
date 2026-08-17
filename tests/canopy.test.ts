@@ -209,6 +209,40 @@ describe('Canopy', () => {
             const length = Math.hypot(branch.x2 - branch.x1, branch.y2 - branch.y1);
             expect(length).toBeGreaterThanOrEqual(1);
         });
+
+        it('should produce identical geometry whether gravity is 0 or omitted', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const omitted = new Canopy(mockCtx as any, { maxDepth: 5 }).GrowBranches({ x: 0, y: 0 });
+            const explicitZero = new Canopy(mockCtx as any, { maxDepth: 5, gravity: 0 }).GrowBranches({ x: 0, y: 0 });
+
+            expect(omitted).toEqual(explicitZero);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should pull branch endpoints downward as gravity increases', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const flat = new Canopy(mockCtx as any, { maxDepth: 5, gravity: 0 }).GrowBranches({ x: 0, y: 0 });
+            const drooping = new Canopy(mockCtx as any, { maxDepth: 5, gravity: 1 }).GrowBranches({ x: 0, y: 0 });
+
+            // Gravity scales with depth, so its effect is clearest at the deepest
+            // level. With identical (mocked) randomness, the only difference
+            // between the two trees is the gravity bias itself, so every endpoint
+            // should sit at the same y or further down (larger y) once drooping.
+            const flatDeep = flat[flat.length - 1];
+            const droopingDeep = drooping[drooping.length - 1];
+
+            let anyStrictlyLower = false;
+            for (let i = 0; i < flatDeep.length; i += 4) {
+                expect(droopingDeep[i + 3]).toBeGreaterThanOrEqual(flatDeep[i + 3]);
+                if (droopingDeep[i + 3] > flatDeep[i + 3]) anyStrictlyLower = true;
+            }
+            expect(anyStrictlyLower).toBe(true);
+
+            randomSpy.mockRestore();
+        });
     });
 
     describe('drawing', () => {

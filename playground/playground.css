@@ -33,12 +33,12 @@ body {
 }
 
 header {
-    padding: 20px 24px 4px;
+    padding: 8px 24px 2px;
 }
 
 header h1 {
-    margin: 0 0 4px;
-    font-size: 1.4rem;
+    margin: 0 0 2px;
+    font-size: 1.25rem;
 }
 
 header p {
@@ -58,7 +58,7 @@ main {
     display: flex;
     gap: 20px;
     align-items: flex-start;
-    padding: 16px 24px 32px;
+    padding: 6px 24px 16px;
 }
 
 #stage {
@@ -86,17 +86,51 @@ canvas {
 }
 
 #panel {
-    flex: 0 0 320px;
+    flex: 0 0 560px;
     background: var(--panel-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 16px;
+    padding: 10px 16px;
+}
+
+#presetField {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+#presetField label {
+    font-weight: 600;
+    color: var(--fg);
+}
+
+#presetField select {
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--fg);
 }
 
 #controls {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+}
+
+/* Colour pickers and the line-cap select read better at full width than
+   squeezed into half a column alongside a dozen sliders — and since they
+   don't need the numeric readout a range gets, label + control fit on one
+   row instead of range fields' label-above-control layout. */
+#controls .field:has(input[type="color"]),
+#controls .field:has(select) {
+    grid-column: 1 / -1;
+    grid-template-columns: 140px 1fr;
+}
+
+#controls .field:has(input[type="color"]) input[type="color"],
+#controls .field:has(select) select {
+    grid-column: 2 / 3;
 }
 
 .field {
@@ -127,7 +161,7 @@ canvas {
 .field input[type="color"] {
     grid-column: 1 / -1;
     width: 100%;
-    height: 32px;
+    height: 24px;
     padding: 2px;
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -137,7 +171,7 @@ canvas {
 .field select {
     grid-column: 1 / -1;
     width: 100%;
-    padding: 6px;
+    padding: 4px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--panel-bg);
@@ -147,12 +181,12 @@ canvas {
 #actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 16px;
+    gap: 6px;
+    margin-top: 6px;
 }
 
 #actions button {
-    padding: 8px 6px;
+    padding: 6px 6px;
     font-size: 0.85rem;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -174,7 +208,7 @@ canvas {
 
 #status {
     min-height: 1.2em;
-    margin: 10px 0 0;
+    margin: 6px 0 0;
     font-size: 0.8rem;
     color: var(--accent);
     text-align: center;
@@ -195,5 +229,9 @@ canvas {
 
     #stage {
         width: 100%;
+    }
+
+    #controls {
+        grid-template-columns: 1fr;
     }
 }

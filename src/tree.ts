@@ -12,6 +12,7 @@ export interface CanopyOptions {
     widthScale: number;
     branchSpread: number;
     spreadJitter: number;
+    gravity: number;
     maxDepth: number;
     leafDepth: number;
     branchColor: string;
@@ -23,6 +24,19 @@ export interface CanopyOptions {
 // screen, so GrowBranches stops recursing rather than spending exponentially
 // more time and memory on segments that wouldn't render visibly anyway.
 const MIN_BRANCH_LENGTH = 1;
+
+// angle=0 points straight down (sin(0)=0, cos(0)=1, and y increases downward
+// on a canvas), so "downward" is the target for gravity. Returns the signed
+// rotation in (-PI, PI] that would take `angle` to 0 by the shorter way
+// around, so biasing an angle toward it always droops rather than occasionally
+// spinning the branch the long way round.
+function angleToDownward(angle: number): number {
+    const TWO_PI = Math.PI * 2;
+    let diff = -angle % TWO_PI;
+    if (diff > Math.PI) diff -= TWO_PI;
+    if (diff < -Math.PI) diff += TWO_PI;
+    return diff;
+}
 
 export class Canopy {
     static defaults: CanopyOptions = {
@@ -37,6 +51,7 @@ export class Canopy {
         widthScale: 0.6,
         branchSpread: (2 * Math.PI) / 11,
         spreadJitter: 1,
+        gravity: 0,
         maxDepth: 11,
         leafDepth: 5,
         branchColor: 'Black',
@@ -131,7 +146,16 @@ export class Canopy {
             for (let i = 0; i < 2; i++) {
                 const direction = i === 0 ? 1 : -1;
                 const spread = options.branchSpread + Math.random() * options.spreadJitter;
-                const branchAngle = angle + direction * (spread / 2);
+                let branchAngle = angle + direction * (spread / 2);
+
+                // Droop outer branches more than inner ones: at depth 0 this is a
+                // no-op (0/maxDepth), and gravity 0 leaves branchAngle untouched
+                // exactly (a no-op * anything finite is exactly 0 in IEEE754), so
+                // existing geometry is unaffected unless gravity is set.
+                if (options.gravity !== 0) {
+                    branchAngle += options.gravity * (depth / options.maxDepth) * angleToDownward(branchAngle);
+                }
+
                 const endX = x + length * Math.sin(branchAngle);
                 const endY = y + length * Math.cos(branchAngle);
 
