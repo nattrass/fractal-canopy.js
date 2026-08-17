@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>fractal-canopy.js playground</title>
+    <link rel="stylesheet" href="playground.css">
+</head>
+<body>
+    <header>
+        <h1>fractal-canopy.js</h1>
+        <p>Live playground &mdash; every <code>CanopyOptions</code> field, adjustable in real time.</p>
+    </header>
+
+    <main>
+        <section id="stage">
+            <canvas id="canopy" width="800" height="400"></canvas>
+            <p id="fitNotice" role="status" aria-live="polite"></p>
+        </section>
+
+        <aside id="panel">
+            <form id="controls"></form>
+
+            <div id="actions">
+                <button type="button" id="randomise">Randomise</button>
+                <button type="button" id="reset">Reset to defaults</button>
+                <button type="button" id="download">Download PNG</button>
+                <button type="button" id="copy">Copy config</button>
+            </div>
+            <p id="status" role="status" aria-live="polite"></p>
+        </aside>
+    </main>
+
+    <script src="../dist/fractal-canopy.min.js"></script>
+    <script src="playground.js"></script>
+</body>
+</html>

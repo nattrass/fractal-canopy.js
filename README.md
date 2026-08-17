@@ -1,6 +1,12 @@
 # fractal-canopy.js
 
+[![CI](https://github.com/nattrass/fractal-canopy.js/actions/workflows/ci.yml/badge.svg)](https://github.com/nattrass/fractal-canopy.js/actions/workflows/ci.yml)
+
 JavaScript library for rendering a [Fractal Canopy](https://en.wikipedia.org/wiki/Fractal_canopy) onto an HTML5 canvas.
+
+**[Live playground](https://nattrass.github.io/fractal-canopy.js/playground/)** &mdash; adjust every option and watch the canopy redraw in real time.
+
+> To surface this link from the repo's own page, add it to the GitHub repo's "About" section (the gear icon next to About on the repo homepage) as the website field &mdash; that has to be set manually, it isn't picked up from this README.
 
 ![A Fractal Canopy](fractal-canopy.png)
 
@@ -97,6 +103,10 @@ npm run build
 - `npm run build` - Build ESM, CJS, IIFE and type declarations into `dist/`
 - `npm run dev` - Rebuild on changes
 - `npm run typecheck` - Type-check the project with `tsc --noEmit`
+
+### Playground
+
+`playground/index.html` is a plain HTML/CSS/JS page with a control for every `CanopyOptions` field. It loads the built IIFE from `../dist/`, so run `npm run build` first, then open the file directly in a browser &mdash; no dev server or build step required for the playground itself. It's also what's published to the [live Pages site](https://nattrass.github.io/fractal-canopy.js/playground/) on every push to `master` (see `.github/workflows/deploy-pages.yml`).
 
 ## Testing
 
