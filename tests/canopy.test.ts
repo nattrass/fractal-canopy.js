@@ -330,4 +330,48 @@ describe('Canopy', () => {
             expect(ctx1.beginPath.mock.calls.length).toBe(ctx1CallCount);
         });
     });
+
+    describe('seed', () => {
+        it('should produce identical geometry for the same seed across separate renders', () => {
+            const levelsA = new Canopy(mockCtx as any, { maxDepth: 5, seed: 'acorn' }).GrowBranches({ x: 0, y: 0 });
+            const levelsB = new Canopy(mockCtx as any, { maxDepth: 5, seed: 'acorn' }).GrowBranches({ x: 0, y: 0 });
+
+            expect(levelsA).toEqual(levelsB);
+        });
+
+        it('should produce identical geometry for the same seed on repeated GrowBranches calls', () => {
+            const canopy = new Canopy(mockCtx as any, { maxDepth: 5, seed: 'acorn' });
+
+            const first = canopy.GrowBranches({ x: 0, y: 0 });
+            const second = canopy.GrowBranches({ x: 0, y: 0 });
+
+            expect(first).toEqual(second);
+        });
+
+        it('should produce different geometry for different seeds', () => {
+            const levelsA = new Canopy(mockCtx as any, { maxDepth: 5, seed: 'acorn' }).GrowBranches({ x: 0, y: 0 });
+            const levelsB = new Canopy(mockCtx as any, { maxDepth: 5, seed: 'oak' }).GrowBranches({ x: 0, y: 0 });
+
+            expect(levelsA).not.toEqual(levelsB);
+        });
+
+        it('should support numeric seeds', () => {
+            const levelsA = new Canopy(mockCtx as any, { maxDepth: 5, seed: 42 }).GrowBranches({ x: 0, y: 0 });
+            const levelsB = new Canopy(mockCtx as any, { maxDepth: 5, seed: 42 }).GrowBranches({ x: 0, y: 0 });
+
+            expect(levelsA).toEqual(levelsB);
+        });
+
+        it('should fall back to Math.random when seed is omitted', () => {
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.42);
+
+            const omitted = new Canopy(mockCtx as any, { maxDepth: 5 }).GrowBranches({ x: 0, y: 0 });
+            const alsoOmitted = new Canopy(mockCtx as any, { maxDepth: 5 }).GrowBranches({ x: 0, y: 0 });
+
+            expect(omitted).toEqual(alsoOmitted);
+            expect(randomSpy).toHaveBeenCalled();
+
+            randomSpy.mockRestore();
+        });
+    });
 });

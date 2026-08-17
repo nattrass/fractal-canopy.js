@@ -87,8 +87,22 @@ canopy.RenderCanopy();
 | `leafDepth` | `5` | Depth at which branches switch to the leaf colour |
 | `branchColor` / `leafColor` | `'Black'` / `'Green'` | Stroke colours |
 | `lineCap` | `'round'` | Canvas line cap. Round fills the joint where a branch forks; `'butt'` leaves a visible step |
+| `seed` | `undefined` | Makes the tree deterministic &mdash; see [Deterministic output](#deterministic-output) |
 
 The defaults are exposed as `Canopy.defaults`.
+
+### Deterministic output
+
+By default every render is randomised (via `Math.random`), so the same options produce a different tree each time. Set `seed` to a string or number and every source of randomness comes from a seeded PRNG instead, so the *same* seed with the *same* options always produces the *exact same* tree, byte-for-byte:
+
+```js
+import { Canopy, presets } from 'fractal-canopy';
+
+const canopy = new Canopy(ctx, { ...presets.cherryBlossom, seed: 'spring' });
+canopy.RenderCanopy(); // always this exact tree, every time
+```
+
+Leave `seed` unset for the original random-every-time behaviour.
 
 ### Presets
 
@@ -137,6 +151,8 @@ npm run build
 ### Playground
 
 `playground/index.html` is a plain HTML/CSS/JS page with a control for every `CanopyOptions` field. It loads the built IIFE from `../dist/`, so run `npm run build` first, then open the file directly in a browser &mdash; no dev server or build step required for the playground itself. It's also what's published to the [live Pages site](https://nattrass.github.io/fractal-canopy.js/playground/) on every push to `master` (see `.github/workflows/deploy-pages.yml`).
+
+The playground's URL is always kept in sync with the current tree (only whatever differs from the defaults, or from the selected preset, is encoded &mdash; e.g. `#preset=cherryBlossom&seed=abc123`), and every render is seeded. That makes every URL shareable: copying it (via the "Copy link" button, or just the address bar) and opening it in a fresh tab reproduces the exact same tree, pixel-for-pixel, with every control populated to match. "Randomise" and picking a preset both set a concrete seed for exactly this reason; "New seed" generates a fresh one for a different tree in the same style.
 
 ## Testing
 

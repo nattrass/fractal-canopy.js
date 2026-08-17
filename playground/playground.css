@@ -33,7 +33,7 @@ body {
 }
 
 header {
-    padding: 8px 24px 2px;
+    padding: 6px 24px 2px;
 }
 
 header h1 {
@@ -90,26 +90,66 @@ canvas {
     background: var(--panel-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 10px 16px;
+    padding: 8px 16px;
 }
 
-#presetField {
-    padding-bottom: 8px;
-    margin-bottom: 8px;
+#identityField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
 
-#presetField label {
+#identityField .field {
+    grid-template-columns: 60px 1fr;
+}
+
+#identityField label {
     font-weight: 600;
     color: var(--fg);
 }
 
-#presetField select {
+#identityField select {
+    grid-column: 2 / 3;
     padding: 6px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--panel-bg);
     color: var(--fg);
+}
+
+.seed-row {
+    display: flex;
+    gap: 6px;
+}
+
+.seed-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.seed-row button {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--fg);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.seed-row button:hover {
+    border-color: var(--accent);
 }
 
 #controls {

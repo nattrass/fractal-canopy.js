@@ -1,4 +1,5 @@
 import { Coordinate } from './coordinate';
+import { createRandom, type RandomFn } from './random';
 
 export interface CanopyOptions {
     originX: number;
@@ -18,6 +19,7 @@ export interface CanopyOptions {
     branchColor: string;
     leafColor: string;
     lineCap: CanvasLineCap;
+    seed?: string | number;
 }
 
 // Branch geometry below this length (in canvas units) is imperceptible on
@@ -118,6 +120,12 @@ export class Canopy {
     GrowBranches(crown: Coordinate): Float64Array[] {
         const options = this.options;
 
+        // Reseeded on every call, so re-rendering the same seeded options
+        // reproduces the same tree instead of drawing a new random one. An
+        // undefined seed falls back to Math.random — today's behaviour,
+        // unaffected by anything above.
+        const random: RandomFn = options.seed === undefined ? Math.random : createRandom(options.seed);
+
         let depthLimit = 0;
         let previewLength = options.branchLength;
         while (depthLimit < options.maxDepth && previewLength >= MIN_BRANCH_LENGTH) {
@@ -145,7 +153,7 @@ export class Canopy {
             // array on every one of the (up to millions of) recursive calls.
             for (let i = 0; i < 2; i++) {
                 const direction = i === 0 ? 1 : -1;
-                const spread = options.branchSpread + Math.random() * options.spreadJitter;
+                const spread = options.branchSpread + random() * options.spreadJitter;
                 let branchAngle = angle + direction * (spread / 2);
 
                 // Droop outer branches more than inner ones: at depth 0 this is a

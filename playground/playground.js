@@ -30,22 +30,45 @@
     var statusEl = document.getElementById('status');
     var fitNoticeEl = document.getElementById('fitNotice');
     var presetSelect = document.getElementById('preset');
+    var seedInput = document.getElementById('seed');
     var controls = {};
 
     // ctx.fillStyle normalises any valid CSS colour (named, hex, rgb...) to
     // "#rrggbb" when read back, which is exactly what <input type="color"> needs.
+    // Assigning an invalid string leaves fillStyle unchanged rather than
+    // throwing, so this also doubles as a safe way to validate colours coming
+    // from an untrusted source (e.g. a pasted URL hash).
     function toHex(color) {
         var probe = document.createElement('canvas').getContext('2d');
         probe.fillStyle = color;
         return probe.fillStyle;
     }
 
-    function defaultsAsHex() {
-        var defaults = FractalCanopy.Canopy.defaults;
-        var copy = Object.assign({}, defaults);
-        copy.branchColor = toHex(defaults.branchColor);
-        copy.leafColor = toHex(defaults.leafColor);
+    function hexifyOptions(options) {
+        var copy = Object.assign({}, options);
+        copy.branchColor = toHex(options.branchColor);
+        copy.leafColor = toHex(options.leafColor);
         return copy;
+    }
+
+    function defaultsAsHex() {
+        return hexifyOptions(FractalCanopy.Canopy.defaults);
+    }
+
+    // What the current tree should be compared against to decide what's worth
+    // putting in the URL: the preset's own resolved values if one is selected
+    // (so picking a preset and changing nothing produces just "#preset=x"),
+    // otherwise the library defaults.
+    function currentBaseline() {
+        var name = presetSelect.value;
+        if (name && FractalCanopy.presets[name]) {
+            return hexifyOptions(Object.assign({}, FractalCanopy.Canopy.defaults, FractalCanopy.presets[name]));
+        }
+        return defaultsAsHex();
+    }
+
+    function generateSeed() {
+        return Math.random().toString(36).slice(2, 10);
     }
 
     function buildControls() {
@@ -104,11 +127,15 @@
         }
     }
 
+    // The single place that pushes an options-like object into every control,
+    // seed included, so every code path that changes the tree (presets,
+    // randomise, reset, loading a shared URL) stays in sync the same way.
     function applyOptions(options) {
         optionDefs.forEach(function (def) {
             controls[def.key].input.value = options[def.key];
             syncOutput(def.key);
         });
+        seedInput.value = options.seed !== undefined && options.seed !== null ? String(options.seed) : '';
     }
 
     function readOptions() {
@@ -117,6 +144,10 @@
             var value = controls[def.key].input.value;
             options[def.key] = def.type === 'range' ? parseFloat(value) : value;
         });
+        var seedValue = seedInput.value.trim();
+        if (seedValue !== '') {
+            options.seed = seedValue;
+        }
         return options;
     }
 
@@ -220,6 +251,119 @@
         fitNoticeEl.textContent = transform.scale < 1
             ? 'Auto-fit: this canopy is bigger than the canvas, so it has been scaled down to stay fully visible.'
             : '';
+
+        updateHash();
+    }
+
+    function valuesDiffer(def, currentRaw, baselineRaw) {
+        if (def.type === 'range') {
+            // A range input silently rounds to the nearest step when its value
+            // is set programmatically (e.g. Math.PI -> "3.14" on a step=0.01
+            // slider), so the control's displayed value and the raw library
+            // default can differ by up to half a step without the user having
+            // touched anything. Tolerate that; only a real change — at least
+            // one whole step away — should count as "differs".
+            var tolerance = def.step / 2 + 1e-9;
+            return Math.abs(parseFloat(currentRaw) - parseFloat(baselineRaw)) > tolerance;
+        }
+        return String(currentRaw) !== String(baselineRaw);
+    }
+
+    // Only what differs from the baseline (defaults, or the selected preset's
+    // own values) goes in the URL, so an unmodified preset link is just
+    // "#preset=name&seed=..." rather than restating every option.
+    function buildHashParams() {
+        var params = new URLSearchParams();
+        var presetName = presetSelect.value;
+        var baseline = currentBaseline();
+
+        if (presetName) {
+            params.set('preset', presetName);
+        }
+
+        optionDefs.forEach(function (def) {
+            var current = controls[def.key].input.value;
+            if (valuesDiffer(def, current, baseline[def.key])) {
+                params.set(def.key, String(current));
+            }
+        });
+
+        var seedValue = seedInput.value.trim();
+        if (seedValue !== '') {
+            params.set('seed', seedValue);
+        }
+
+        return params;
+    }
+
+    // Keeps the address bar in sync without adding a history entry per slider
+    // tick (replaceState, not pushState/location.hash) and without the
+    // scroll-to-anchor jump a real hash navigation would cause.
+    function updateHash() {
+        var hash = buildHashParams().toString();
+        var url = location.pathname + location.search + (hash ? '#' + hash : '');
+        history.replaceState(null, '', url);
+    }
+
+    // Parses location.hash into an options object and applies it. Invalid or
+    // unrecognised values are skipped individually (falling back to the
+    // relevant baseline value) rather than aborting the whole thing, so a
+    // partially malformed hash still renders something sensible instead of
+    // throwing. Returns false (and touches nothing) if there's no usable state
+    // in the hash at all, so the caller can fall back to plain defaults.
+    function applyStateFromHash() {
+        var raw = location.hash.replace(/^#/, '');
+        if (!raw) return false;
+
+        var params;
+        try {
+            params = new URLSearchParams(raw);
+        } catch (e) {
+            return false;
+        }
+
+        var presetName = params.get('preset');
+        var hasPreset = !!(presetName && FractalCanopy.presets[presetName]);
+        var baseline = hasPreset
+            ? hexifyOptions(Object.assign({}, FractalCanopy.Canopy.defaults, FractalCanopy.presets[presetName]))
+            : defaultsAsHex();
+
+        var options = Object.assign({}, baseline);
+        var appliedAny = hasPreset;
+
+        optionDefs.forEach(function (def) {
+            if (!params.has(def.key)) return;
+            var value = params.get(def.key);
+
+            if (def.type === 'range') {
+                var num = parseFloat(value);
+                if (Number.isFinite(num)) {
+                    options[def.key] = num;
+                    appliedAny = true;
+                }
+            } else if (def.type === 'select') {
+                if (def.options.indexOf(value) !== -1) {
+                    options[def.key] = value;
+                    appliedAny = true;
+                }
+            } else if (def.type === 'color') {
+                options[def.key] = toHex(value);
+                appliedAny = true;
+            }
+        });
+
+        var seedParam = params.get('seed');
+        if (seedParam !== null && seedParam !== '') {
+            options.seed = seedParam;
+            appliedAny = true;
+        }
+
+        if (!appliedAny) return false;
+
+        presetSelect.value = hasPreset ? presetName : '';
+        applyOptions(options);
+        render();
+        return true;
     }
 
     function showStatus(message) {
@@ -242,6 +386,9 @@
         return '#' + value.toString(16).padStart(6, '0');
     }
 
+    // Randomising sets a concrete seed rather than leaving it blank (which
+    // would fall back to Math.random and reshuffle on every re-render), so
+    // whatever it lands on is reproducible and shareable, not one-off.
     function randomise() {
         presetSelect.value = '';
         var options = {};
@@ -254,6 +401,7 @@
                 options[def.key] = def.options[Math.floor(Math.random() * def.options.length)];
             }
         });
+        options.seed = generateSeed();
         applyOptions(options);
         render();
         showStatus('Randomised');
@@ -294,18 +442,26 @@
     // Presets are partial CanopyOptions, same as what you'd hand to
     // `new FractalCanopy.Canopy(ctx, presets.x)`, so mirror that constructor's
     // own merge (defaults + preset) rather than layering onto whatever the
-    // controls currently hold.
+    // controls currently hold. Also sets a seed, so a shared preset link
+    // reproduces the exact tree rather than a fresh random one each visit.
     function applyPreset(name) {
         var preset = FractalCanopy.presets[name];
         if (!preset) return;
 
-        var merged = Object.assign({}, defaultsAsHex(), preset);
-        if (preset.branchColor) merged.branchColor = toHex(preset.branchColor);
-        if (preset.leafColor) merged.leafColor = toHex(preset.leafColor);
+        var merged = hexifyOptions(Object.assign({}, FractalCanopy.Canopy.defaults, preset));
+        merged.seed = generateSeed();
 
         applyOptions(merged);
         render();
         showStatus('Loaded preset: ' + presetLabel(name));
+    }
+
+    function newSeed() {
+        var options = readOptions();
+        options.seed = generateSeed();
+        applyOptions(options);
+        render();
+        showStatus('New seed: ' + options.seed);
     }
 
     function downloadPng() {
@@ -327,22 +483,16 @@
         return JSON.stringify(value);
     }
 
-    function copyConfig() {
-        var options = readOptions();
-        var lines = optionDefs.map(function (def) {
-            return '    ' + def.key + ': ' + formatConfigValue(def, options[def.key]) + ',';
-        });
-        var snippet = 'new FractalCanopy.Canopy(ctx, {\n' + lines.join('\n') + '\n});';
-
+    function copyTextToClipboard(text, successMessage) {
         var copyText = function () {
             return navigator.clipboard && navigator.clipboard.writeText
-                ? navigator.clipboard.writeText(snippet)
+                ? navigator.clipboard.writeText(text)
                 : Promise.reject(new Error('Clipboard API unavailable'));
         };
 
         copyText().catch(function () {
             var textarea = document.createElement('textarea');
-            textarea.value = snippet;
+            textarea.value = text;
             textarea.style.position = 'fixed';
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
@@ -350,20 +500,43 @@
             document.execCommand('copy');
             document.body.removeChild(textarea);
         }).then(function () {
-            showStatus('Config copied to clipboard');
+            showStatus(successMessage);
         }, function () {
             showStatus('Could not copy — see console');
-            console.log(snippet);
+            console.log(text);
         });
+    }
+
+    function copyConfig() {
+        var options = readOptions();
+        var lines = optionDefs.map(function (def) {
+            return '    ' + def.key + ': ' + formatConfigValue(def, options[def.key]) + ',';
+        });
+        if (options.seed !== undefined) {
+            lines.push('    seed: ' + JSON.stringify(options.seed) + ',');
+        }
+        var snippet = 'new FractalCanopy.Canopy(ctx, {\n' + lines.join('\n') + '\n});';
+        copyTextToClipboard(snippet, 'Config copied to clipboard');
+    }
+
+    // The primary share action: the address bar is already kept live in sync
+    // with the current tree (see updateHash), so this just needs to copy it.
+    function copyLink() {
+        copyTextToClipboard(location.href, 'Link copied to clipboard');
     }
 
     buildControls();
     buildPresetPicker();
-    applyOptions(defaultsAsHex());
-    render();
+    if (!applyStateFromHash()) {
+        applyOptions(defaultsAsHex());
+        render();
+    }
 
     document.getElementById('randomise').addEventListener('click', randomise);
     document.getElementById('reset').addEventListener('click', resetToDefaults);
     document.getElementById('download').addEventListener('click', downloadPng);
     document.getElementById('copy').addEventListener('click', copyConfig);
+    document.getElementById('copyLink').addEventListener('click', copyLink);
+    document.getElementById('newSeed').addEventListener('click', newSeed);
+    seedInput.addEventListener('input', scheduleRender);
 })();
